@@ -46,7 +46,7 @@ object GlutenWriterColumnarRules {
     cmd match {
       case command: CreateDataSourceTableAsSelectCommand
           if !BackendsApiManager.getSettings.skipNativeCtas(command) =>
-        command.table.provider.filter(GlutenFormatFactory.isRegistered)
+        command.catalogTable.provider.filter(GlutenFormatFactory.isRegistered)
       case command: InsertIntoHadoopFsRelationCommand
           if !BackendsApiManager.getSettings.skipNativeInsertInto(command) =>
         command.fileFormat match {

@@ -83,7 +83,7 @@ abstract class FileSourceScanExecShim(
       partitions: Seq[PartitionDirectory],
       static: Boolean): Unit = {
     val filesNum = partitions.map(_.files.size.toLong).sum
-    val filesSize = partitions.map(_.files.map(_.getLen).sum).sum
+    val filesSize = partitions.map(_.files.map(_.length).sum).sum
     if (!static || !partitionFilters.exists(isDynamicPruningFilter)) {
       driverMetrics("numFiles").set(filesNum)
       driverMetrics("filesSize").set(filesSize)
