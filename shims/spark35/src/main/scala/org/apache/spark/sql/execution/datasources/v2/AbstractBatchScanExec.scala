@@ -108,7 +108,7 @@ abstract class AbstractBatchScanExec(
                 "partition values that are not present in the original partitioning.")
           }
 
-          groupPartitions(newPartitions).getOrElse(Seq.empty).map(_._2)
+          groupPartitions(newPartitions).get.groupedParts.map(_.parts)
 
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
@@ -155,8 +155,11 @@ abstract class AbstractBatchScanExec(
                 "is enabled"
             )
 
-            val groupedPartitions =
-              groupPartitions(finalPartitions.map(_.head), groupSplits = true).getOrElse(Seq.empty)
+            val groupedPartitions = filteredPartitions.map(
+              splits => {
+                assert(splits.nonEmpty && splits.head.isInstanceOf[HasPartitionKey])
+                (splits.head.asInstanceOf[HasPartitionKey].partitionKey(), splits)
+              })
 
             // This means the input partitions are not grouped by partition values. We'll need to
             // check `groupByPartitionValues` and decide whether to group and replicate splits

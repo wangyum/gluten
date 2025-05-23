@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.KeyGroupedPartitioning
 import org.apache.spark.sql.catalyst.util.InternalRowComparableWrapper
 import org.apache.spark.sql.connector.catalog.Table
+import org.apache.spark.sql.connector.catalog.functions.Reducer
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, Scan, SupportsRuntimeV2Filtering}
 import org.apache.spark.sql.execution.datasources.v2.orc.OrcScan
@@ -37,7 +38,9 @@ abstract class BatchScanExecShim(
     keyGroupedPartitioning: Option[Seq[Expression]] = None,
     ordering: Option[Seq[SortOrder]] = None,
     @transient val table: Table,
+    val joinKeyPositions: Option[Seq[Int]] = None,
     val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
+    val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
     val applyPartialClustering: Boolean = false,
     val replicatePartitions: Boolean = false)
   extends AbstractBatchScanExec(
@@ -48,7 +51,9 @@ abstract class BatchScanExecShim(
     table,
     StoragePartitionJoinParams(
       keyGroupedPartitioning,
+      joinKeyPositions,
       commonPartitionValues,
+      reducers,
       applyPartialClustering,
       replicatePartitions)
   ) {
@@ -125,7 +130,7 @@ abstract class BatchScanExecShim(
                 "partition values that are not present in the original partitioning.")
           }
 
-          groupPartitions(newPartitions).get.map(_._2)
+          groupPartitions(newPartitions).get.groupedParts.map(_.parts)
 
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
