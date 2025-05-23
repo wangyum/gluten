@@ -30,6 +30,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.connector.catalog.Table
+import org.apache.spark.sql.connector.catalog.functions.Reducer
 import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExecShim, FileScan}
 import org.apache.spark.sql.execution.metric.SQLMetric
@@ -43,7 +44,9 @@ case class BatchScanExecTransformer(
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val ordering: Option[Seq[SortOrder]] = None,
     @transient override val table: Table,
+    override val joinKeyPositions: Option[Seq[Int]] = None,
     override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
+    override val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
     override val applyPartialClustering: Boolean = false,
     override val replicatePartitions: Boolean = false)
   extends BatchScanExecTransformerBase(
@@ -53,9 +56,12 @@ case class BatchScanExecTransformer(
     keyGroupedPartitioning,
     ordering,
     table,
+    joinKeyPositions,
     commonPartitionValues,
+    reducers,
     applyPartialClustering,
-    replicatePartitions) {
+    replicatePartitions
+  ) {
 
   protected[this] def supportsBatchScan(scan: Scan): Boolean = {
     scan.isInstanceOf[FileScan]
@@ -78,7 +84,9 @@ abstract class BatchScanExecTransformerBase(
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val ordering: Option[Seq[SortOrder]] = None,
     @transient override val table: Table,
+    override val joinKeyPositions: Option[Seq[Int]] = None,
     override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
+    override val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
     override val applyPartialClustering: Boolean = false,
     override val replicatePartitions: Boolean = false)
   extends BatchScanExecShim(
@@ -88,9 +96,12 @@ abstract class BatchScanExecTransformerBase(
     keyGroupedPartitioning,
     ordering,
     table,
+    joinKeyPositions,
     commonPartitionValues,
+    reducers,
     applyPartialClustering,
-    replicatePartitions)
+    replicatePartitions
+  )
   with BasicScanExecTransformer {
 
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.
