@@ -474,9 +474,11 @@ class Spark35Shims extends SparkShims {
                   "is enabled"
               )
 
-              val groupedPartitions = batchScan
-                .groupPartitions(finalPartitions.map(_.head), true)
-                .getOrElse(Seq.empty)
+              val groupedPartitions = filteredPartitions.map(
+                splits => {
+                  assert(splits.nonEmpty && splits.head.isInstanceOf[HasPartitionKey])
+                  (splits.head.asInstanceOf[HasPartitionKey].partitionKey(), splits)
+                })
 
               // This means the input partitions are not grouped by partition values. We'll need to
               // check `groupByPartitionValues` and decide whether to group and replicate splits
