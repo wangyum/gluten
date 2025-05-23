@@ -37,7 +37,11 @@ object GlutenFileFormatWriter {
       sparkAttemptNumber,
       committer,
       iterator,
-      None
+      None,
+      Map.empty,
+      Int.MaxValue,
+      Int.MaxValue,
+      Int.MaxValue
     )
   }
 }
