@@ -71,7 +71,7 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
        """.stripMargin)
 
       val found = df.queryExecution.executedPlan.find {
-        case _ @BroadcastHashJoinExec(_, _, _: ExistenceJoin, _, _, _, _, _) => true
+        case _ @BroadcastHashJoinExec(_, _, _: ExistenceJoin, _, _, _, _, _, _) => true
         case _ => false
       }
 
@@ -235,12 +235,12 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     val plan = df.queryExecution.executedPlan
     val dpExprs = collectDynamicPruningExpressions(plan)
     val hasSubquery = dpExprs.exists {
-      case InSubqueryExec(_, _: SubqueryExec, _, _, _, _) => true
+      case InSubqueryExec(_, _: SubqueryExec, _, _, _, _, _) => true
       case _ => false
     }
     val subqueryBroadcast = dpExprs.collect {
-      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) => b
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) => b
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _, _) => b
+      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _, _) => b
     }
 
     val hasFilter = if (withSubquery) "Should" else "Shouldn't"
@@ -293,9 +293,9 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     df.collect()
 
     val buf = collectDynamicPruningExpressions(df.queryExecution.executedPlan).collect {
-      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) =>
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _, _) =>
         b.index
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) =>
+      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _, _) =>
         b.index
     }
     assert(buf.distinct.size == n)

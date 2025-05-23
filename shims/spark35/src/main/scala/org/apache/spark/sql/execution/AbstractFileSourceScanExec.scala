@@ -82,6 +82,16 @@ abstract class AbstractFileSourceScanExec(
     }
   }
 
+  private lazy val canPartialScan = {
+    relation.location match {
+      case c: CatalogFileIndex => c.partialListing
+      case i: InMemoryFileIndex => i.partialListing
+      case _ => false
+    }
+  }
+
+  def isPartialScan: Boolean = !bucketedScan && canPartialScan
+
   lazy val inputRDD: RDD[InternalRow] = {
     val options = relation.options +
       (FileFormat.OPTION_RETURNING_BATCH -> supportsColumnar.toString)
@@ -264,11 +274,11 @@ abstract class AbstractFileSourceScanExec(
         partition =>
           partition.files.flatMap {
             file =>
-              if (shouldProcess(file.getPath)) {
+              if (shouldProcess(file.path)) {
                 val isSplitable = relation.fileFormat.isSplitable(
                   relation.sparkSession,
                   relation.options,
-                  file.getPath)
+                  file.path)
                 PartitionedFileUtil.splitFiles(
                   sparkSession = relation.sparkSession,
                   file = file,
@@ -283,18 +293,47 @@ abstract class AbstractFileSourceScanExec(
       }
       .sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
-    val partitions =
-      FilePartition.getFilePartitions(relation.sparkSession, splitFiles, maxSplitBytes)
-
-    new FileScanRDD(
-      relation.sparkSession,
-      readFile,
-      partitions,
-      new StructType(requiredSchema.fields ++ relation.partitionSchema.fields),
-      fileConstantMetadataColumns,
-      relation.fileFormat.fileConstantMetadataExtractors,
-      new FileSourceOptions(CaseInsensitiveMap(relation.options))
-    )
+    val fileScanRDD = if (!canPartialScan) {
+      val partitions =
+        FilePartition.getFilePartitions(relation.sparkSession, splitFiles, maxSplitBytes)
+      new FileScanRDD(
+        relation.sparkSession,
+        readFile,
+        partitions,
+        new StructType(requiredSchema.fields ++ relation.partitionSchema.fields),
+        fileConstantMetadataColumns,
+        relation.fileFormat.fileConstantMetadataExtractors,
+        new FileSourceOptions(CaseInsensitiveMap(relation.options))
+      )
+    } else {
+      logInfo(s"SinglePartitionReadRDD scan ${splitFiles.length} files")
+      val partitions = FilePartition.getSingleFilePartitions(splitFiles)
+      val rootPaths = if (relation.location.partitionSchema.length == 0) {
+        relation.location.rootPaths.map(_.toUri.toString -> InternalRow.empty).toMap
+      } else {
+        val prunedPartitions = relation.sparkSession.sessionState.catalog
+          .listPartitionsByFilter(tableIdentifier.get, partitionFilters)
+        prunedPartitions.map {
+          p =>
+            p.location.toString -> p.toRow(
+              relation.location.partitionSchema,
+              relation.sparkSession.sessionState.conf.sessionLocalTimeZone)
+        }.toMap
+      }
+      new FileScanRDD(
+        relation.sparkSession,
+        readFile,
+        partitions,
+        new StructType(requiredSchema.fields ++ relation.partitionSchema.fields),
+        fileConstantMetadataColumns,
+        relation.fileFormat.fileConstantMetadataExtractors,
+        new FileSourceOptions(CaseInsensitiveMap(relation.options)),
+        partialScan = true,
+        rootPaths = rootPaths
+      )
+    }
+    Option(session).foreach(_.sparkContext.cleaner.foreach(_.registerRDDForCleanup(fileScanRDD)))
+    fileScanRDD
   }
 
   // Filters unused DynamicPruningExpression expressions - one which has been replaced

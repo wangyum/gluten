@@ -345,17 +345,20 @@
     </profile>
     <profile>
       <id>spark-3.5</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
       <properties>
         <sparkbundle.version>3.5</sparkbundle.version>
         <sparkshim.artifactId>spark-sql-columnar-shims-spark35</sparkshim.artifactId>
-        <spark.version>3.5.2</spark.version>
-        <iceberg.version>1.5.0</iceberg.version>
+        <spark.version>3.5.0-ebay.0-SNAPSHOT</spark.version>
+        <iceberg.version>1.6.1.1.0.0-SNAPSHOT</iceberg.version>
         <delta.package.name>delta-spark</delta.package.name>
-        <delta.version>3.2.0</delta.version>
-        <delta.binary.version>32</delta.binary.version>
-        <hudi.version>0.15.0</hudi.version>
+        <delta.version>3.0.0-ebay.0-SNAPSHOT</delta.version>
+	    <delta.binary.version>24</delta.binary.version>
+	    <hudi.version>0.15.0</hudi.version>
         <fasterxml.version>2.15.1</fasterxml.version>
-        <hadoop.version>3.3.4</hadoop.version>
+        <hadoop.version>3.3.3.1.0.39</hadoop.version>
         <antlr4.version>4.9.3</antlr4.version>
       </properties>
       <dependencies>
