@@ -16,12 +16,14 @@
  */
 package org.apache.hadoop.fs.viewfs
 
+import org.apache.spark.internal.Logging
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import scala.collection.mutable
 
-object ViewFileSystemUtils {
+object ViewFileSystemUtils extends Logging {
 
   /**
    * Convert the viewfs path to hdfs path. Similar to ViewFileSystem.resolvePath, but does not make
@@ -66,6 +68,7 @@ object ViewFileSystemUtils {
           val hdfsPath = viewfsToHdfsCache.getOrElseUpdate(
             pathPrefix,
             convertViewfsToHdfs(pathPrefix, hadoopConfig))
+          logWarning(s"yumwang: pathPrefix: $pathPrefix, hdfsPath: $hdfsPath")
           hdfsPath + Path.SEPARATOR + pathSplit.drop(prefixIndex).mkString(Path.SEPARATOR)
         } else {
           path
