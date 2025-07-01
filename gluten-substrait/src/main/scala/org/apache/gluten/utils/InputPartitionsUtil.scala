@@ -21,7 +21,9 @@ import org.apache.gluten.sql.shims.SparkShimLoader
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.connector.read.InputPartition
+import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources.{BucketingUtils, FilePartition, HadoopFsRelation, PartitionDirectory}
+import org.apache.spark.sql.execution.datasources.FilePartition.{maxSplitBytesBySpecifiedNum, minPartitionNumBySpecifiedSize}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
 
@@ -47,9 +49,30 @@ case class InputPartitionsUtil(
   }
 
   private def genNonBuckedInputPartitionSeq(): Seq[InputPartition] = {
+    val originSize = FilePartition.maxSplitBytes(relation.sparkSession, selectedPartitions)
     val openCostInBytes = relation.sparkSession.sessionState.conf.filesOpenCostInBytes
     val maxSplitBytes =
-      FilePartition.maxSplitBytes(relation.sparkSession, selectedPartitions)
+      if (
+        relation.sparkSession.sessionState.conf.bucketingEnabled &&
+        relation.bucketSpec.isDefined
+      ) {
+        val partitionNum =
+          minPartitionNumBySpecifiedSize(relation.sparkSession, selectedPartitions, originSize)
+        val bucketNum = math.max(
+          relation.bucketSpec.get.numBuckets,
+          relation.sparkSession.sessionState.conf.numShufflePartitions)
+        val maxBucketScanParts = relation.sparkSession.sessionState.conf.filesMaxPartitionNum
+          .map(_.min(bucketNum))
+          .getOrElse(bucketNum)
+        if (partitionNum > maxBucketScanParts) {
+          maxSplitBytesBySpecifiedNum(relation.sparkSession, selectedPartitions, maxBucketScanParts)
+        } else {
+          originSize
+        }
+      } else {
+        originSize
+      }
+
     logInfo(
       s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
         s"open cost is considered as scanning $openCostInBytes bytes.")
@@ -73,22 +96,19 @@ case class InputPartitionsUtil(
     val splitFiles = selectedPartitions
       .flatMap {
         partition =>
-          SparkShimLoader.getSparkShims.getFileStatus(partition).flatMap {
+          partition.files.flatMap {
             file =>
               // getPath() is very expensive so we only want to call it once in this block:
-              val filePath = file._1.getPath
+              val filePath = file.path
               if (shouldProcess(filePath)) {
                 val isSplitable =
                   SparkShimLoader.getSparkShims.isFileSplittable(relation, filePath, requiredSchema)
-                SparkShimLoader.getSparkShims.splitFiles(
-                  sparkSession = relation.sparkSession,
-                  file = file._1,
-                  filePath = filePath,
-                  isSplitable = isSplitable,
-                  maxSplitBytes = maxSplitBytes,
-                  partitionValues = partition.values,
-                  metadata = file._2
-                )
+                PartitionedFileUtil.splitFiles(
+                  relation.sparkSession,
+                  file,
+                  isSplitable,
+                  maxSplitBytes,
+                  partition.values)
               } else {
                 Seq.empty
               }
