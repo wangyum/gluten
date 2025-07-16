@@ -77,6 +77,22 @@ case class InputPartitionsUtil(
       s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
         s"open cost is considered as scanning $openCostInBytes bytes.")
 
+    // Filter files with bucket pruning if possible
+    val bucketingEnabled = relation.sparkSession.sessionState.conf.bucketingEnabled
+    val shouldProcess: Path => Boolean = optionalBucketSet match {
+      case Some(bucketSet) if bucketingEnabled =>
+        filePath => {
+          BucketingUtils.getBucketId(filePath.getName) match {
+            case Some(id) => bucketSet.get(id)
+            case None =>
+              // Do not prune the file if bucket file name is invalid
+              true
+          }
+        }
+      case _ =>
+        _ => true
+    }
+
     val splitFiles = selectedPartitions
       .flatMap {
         partition =>
