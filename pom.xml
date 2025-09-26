@@ -57,6 +57,13 @@
     <developerConnection>scm:git:ssh://github.com:apache/incubator-gluten.git</developerConnection>
     <url>https://github.com/apache/incubator-gluten/tree/main</url>
   </scm>
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/wangyum/incubator-gluten</url>
+    </repository>
+  </distributionManagement>
 
   <properties>
     <java.version>1.8</java.version>
@@ -2005,11 +2012,4 @@
       </properties>
     </profile>
   </profiles>
-  <distributionManagement>
-    <repository>
-      <id>github</id>
-      <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/wangyum/incubator-gluten</url>
-    </repository>
-  </distributionManagement>
 </project>
