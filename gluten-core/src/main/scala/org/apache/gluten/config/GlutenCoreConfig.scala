@@ -84,7 +84,7 @@ object GlutenCoreConfig {
         "Whether to enable gluten. Default value is true. Just an experimental property." +
           " Recommend to enable/disable Gluten through the setting for spark.plugins.")
       .booleanConf
-      .createWithDefault(true)
+      .createWithDefault(false)
 
   // Options used by RAS.
   val RAS_ENABLED =
