@@ -110,6 +110,8 @@ jobs:
           mvn clean install -Pspark-3.5 -Dhadoop.version=3.3.3.1.0.39 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           mvn clean deploy -Pspark-3.5 -Dhadoop.version=3.3.3.1.0.39 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           ls -lh package/target/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload bundle package
         uses: actions/upload-artifact@v4
         with:
@@ -130,6 +132,8 @@ jobs:
           mvn clean deploy -Pspark-3.5 -Pscala-2.13 -Dhadoop.version=3.3.3.1.0.39 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           ls -lh package/target/
           md5sum package/target/gluten-velox-bundle-spark3.5*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload bundle package with scala 2.13
         uses: actions/upload-artifact@v4
         with:
