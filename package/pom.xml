@@ -22,7 +22,7 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>gluten-package</artifactId>
+  <artifactId>gluten-package_${scala.binary.version}</artifactId>
   <packaging>jar</packaging>
   <name>Gluten Package</name>
 
