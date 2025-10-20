@@ -50,6 +50,7 @@ case class PartitionsUtil(
   private def genNonBuckedPartitionSeq(): Seq[Partition] = {
     val originSize = FilePartition.maxSplitBytes(relation.sparkSession, selectedPartitions)
     val openCostInBytes = relation.sparkSession.sessionState.conf.filesOpenCostInBytes
+    // [HADP-55535] Reduce RPCs when disabling bucket reads
     val maxSplitBytes =
       if (
         relation.sparkSession.sessionState.conf.bucketingEnabled &&
