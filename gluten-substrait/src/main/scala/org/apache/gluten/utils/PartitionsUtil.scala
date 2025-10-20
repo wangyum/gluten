@@ -95,19 +95,22 @@ case class PartitionsUtil(
     val splitFiles = selectedPartitions
       .flatMap {
         partition =>
-          partition.files.flatMap {
+          SparkShimLoader.getSparkShims.getFileStatus(partition).flatMap {
             file =>
               // getPath() is very expensive so we only want to call it once in this block:
-              val filePath = file.path
+              val filePath = file._1.getPath
               if (shouldProcess(filePath)) {
                 val isSplitable =
                   SparkShimLoader.getSparkShims.isFileSplittable(relation, filePath, requiredSchema)
-                PartitionedFileUtil.splitFiles(
-                  relation.sparkSession,
-                  file,
-                  isSplitable,
-                  maxSplitBytes,
-                  partition.values)
+                SparkShimLoader.getSparkShims.splitFiles(
+                  sparkSession = relation.sparkSession,
+                  file = file._1,
+                  filePath = filePath,
+                  isSplitable = isSplitable,
+                  maxSplitBytes = maxSplitBytes,
+                  partitionValues = partition.values,
+                  metadata = file._2
+                )
               } else {
                 Seq.empty
               }
