@@ -273,11 +273,11 @@ function setup_dependencies {
   pwd
   file='../build/velox_ep/scripts/setup-common.sh'
   sed -i '427d' "$file"
-  sed -i '426s|$| sh ${GLUTEN_DIR}/build-tools/install.sh|' "$file"
+  sed -i '426s|$| pwd && sh ../build-tools/install.sh|' "$file"
   cat "$file"
 
   source $GLUTEN_DIR/dev/build-helper-functions.sh
-  source ../scripts/setup-common.sh
+  source ${VELOX_HOME}/scripts/setup-common.sh
 
   echo "Start to install dependencies"
   pushd $VELOX_HOME
