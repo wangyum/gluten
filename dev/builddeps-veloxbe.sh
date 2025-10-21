@@ -270,7 +270,8 @@ function setup_dependencies {
   DEPENDENCY_DIR=${DEPENDENCY_DIR:-$CURRENT_DIR/../ep/_ep}
   mkdir -p ${DEPENDENCY_DIR}
 
-  file='ep/build-velox/build/velox_ep/scripts/setup-common.sh'
+  pwd
+  file='../ep/build-velox/build/velox_ep/scripts/setup-common.sh'
   sed -i '410d' "$file"
   sed -i '409s|$| sh build-tools/install.sh|' "$file"
   cat "$file"
