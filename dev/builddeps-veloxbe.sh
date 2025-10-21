@@ -272,8 +272,8 @@ function setup_dependencies {
 
   pwd
   file='../build/velox_ep/scripts/setup-common.sh'
-  sed -i '429d' "$file"
-  sed -i '428s|$| sh build-tools/install.sh|' "$file"
+  sed -i '428d' "$file"
+  sed -i '427s|$| sh build-tools/install.sh|' "$file"
   cat "$file"
 
   source $GLUTEN_DIR/dev/build-helper-functions.sh
