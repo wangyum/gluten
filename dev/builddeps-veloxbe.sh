@@ -277,7 +277,7 @@ function setup_dependencies {
   cat "$file"
 
   source $GLUTEN_DIR/dev/build-helper-functions.sh
-  source ${VELOX_HOME}/scripts/setup-common.sh
+  source ../scripts/setup-common.sh
 
   echo "Start to install dependencies"
   pushd $VELOX_HOME
