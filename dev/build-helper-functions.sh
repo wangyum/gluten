@@ -154,8 +154,8 @@ function setup_macos {
 function setup_linux {
   pwd
   file1='scripts/setup-common.sh'
-  sed -i '238d' "$file1"
-  sed -i '238a\
+  sed -i '260d' "$file1"
+  sed -i '260a\
   mv /home/jenkins/workspace/gluten-release/libstemmer_c-2.2.0 ${DEPENDENCY_DIR}/stemmer' $file1
   cat "$file1"
 
