@@ -153,7 +153,7 @@ function setup_macos {
 
 function setup_linux {
   pwd
-  file='../ep/build-velox/src/setup-centos7.sh'
+  file='../../src/setup-centos7.sh'
   sed -i '81d' "$file"
   sed -i '79d' "$file"
   sed -i '79a\
