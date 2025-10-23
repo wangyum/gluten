@@ -157,7 +157,7 @@ function setup_linux {
   sed -i '144d' "$file"
   sed -i '145d' "$file"
   sed -i '143a\
-  bash /home/jenkins/workspace/gluten-release/build-tools/Miniconda3-latest-Linux-x86_64.sh -b -u $MINICONDA_PATH' $file
+  bash /home/jenkins/workspace/gluten-release/build-tools/Miniconda3-latest-Linux-x86_64.sh -b -p "$MINICONDA_PATH"' $file
   cat "$file"
 
   local LINUX_DISTRIBUTION=$(. /etc/os-release && echo ${ID})
