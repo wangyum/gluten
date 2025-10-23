@@ -152,6 +152,14 @@ function setup_macos {
 }
 
 function setup_linux {
+  pwd
+  file='../ep/build-velox/src/setup-centos7.sh'
+  sed -i '81d' "$file"
+  sed -i '79d' "$file"
+  sed -i '79a\
+  bash /home/jenkins/workspace/gluten-release/build-tools/Miniconda3-latest-Linux-x86_64.sh -b -u $MINICONDA_PATH|' $file
+  cat "$file"
+
   local LINUX_DISTRIBUTION=$(. /etc/os-release && echo ${ID})
   local LINUX_VERSION_ID=$(. /etc/os-release && echo ${VERSION_ID})
   CURRENT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)

@@ -273,8 +273,7 @@ function setup_dependencies {
   pwd
   file='../build/velox_ep/scripts/setup-common.sh'
   sed -i '427d' "$file"
-  sed -i '426s|$| sh /home/jenkins/workspace/Gluten-release/build-tools/install.sh|' "$file"
-  sed -i 's/threading=multi/threading=single/g' "$file"
+  sed -i '426s|$| sh /home/jenkins/workspace/gluten-release/build-tools/install.sh|' "$file"
   cat "$file"
 
   source $GLUTEN_DIR/dev/build-helper-functions.sh
