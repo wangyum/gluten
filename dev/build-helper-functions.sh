@@ -153,10 +153,9 @@ function setup_macos {
 
 function setup_linux {
   pwd
-  file='../../src/setup-centos7.sh'
-  sed -i '81d' "$file"
-  sed -i '79d' "$file"
-  sed -i '79a\
+  file='scripts/setup-centos7.sh'
+  sed -i '144d' "$file"
+  sed -i '143a\
   bash /home/jenkins/workspace/gluten-release/build-tools/Miniconda3-latest-Linux-x86_64.sh -b -u $MINICONDA_PATH' $file
   cat "$file"
 
