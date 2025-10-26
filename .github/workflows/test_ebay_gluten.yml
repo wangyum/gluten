@@ -105,6 +105,14 @@ jobs:
   build-internal-dependency:
     runs-on: ubuntu-22.04
     steps:
+      - uses: actions/checkout@v4
+      - name: Get Ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-m2-repository-${{github.sha}}
+          restore-keys: |
+            ccache-m2-repository
       - name: Setup java and maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
