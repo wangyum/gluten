@@ -138,7 +138,7 @@ jobs:
         run: |
           pwd
           ls -l
-          cd ../ebay-spark && build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
       - name: "Save ccache"
         uses: actions/cache/save@v4
         id: ccache
