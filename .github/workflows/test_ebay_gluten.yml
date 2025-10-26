@@ -121,20 +121,20 @@ jobs:
           repository: wangyum/packages
           ref: master
           token: ${{ secrets.EBAY_TOKEN }}
-#      - name: Install packages to $M2_REPOSITORY
-#        run: |
-#          pwd
-#          mkdir -p $M2_REPOSITORY
-#          rm -rf $M2_REPOSITORY/io && rm -rf $M2_REPOSITORY/org
-#          mv ../packages/* $M2_REPOSITORY
-#          cd $M2_REPOSITORY && find . -name "_*.repositories" | xargs rm -rf
+      - name: Install packages to /home/runner/.m2/repository
+        run: |
+          pwd
+          mkdir -p /home/runner/.m2/repository
+          rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
+          mv ../packages/* /home/runner/.m2/repository
+          cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
       - name: Checkout ebay-spark repo
         uses: actions/checkout@v2
         with:
           repository: wangyum/ebay-spark
           ref: gluten-build
           token: ${{ secrets.EBAY_TOKEN }}
-      - name: Install ebay-spark to $M2_REPOSITORY
+      - name: Install ebay-spark to /home/runner/.m2/repository
         run: |
           pwd
           ls -l
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: m2-dependency-${{github.sha}}
-          path: .m2/repository/
+          path: /home/runner/.m2/repository
           if-no-files-found: error
 
   tpc-test-ubuntu:
