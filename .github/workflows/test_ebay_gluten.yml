@@ -136,6 +136,8 @@ jobs:
           token: ${{ secrets.EBAY_TOKEN }}
       - name: Install ebay-spark to $M2_REPOSITORY
         run: |
+          pwd
+          ls -l
           cd ../ebay-spark && build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
       - name: "Save ccache"
         uses: actions/cache/save@v4
