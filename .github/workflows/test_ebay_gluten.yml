@@ -126,6 +126,7 @@ jobs:
           pwd
           mkdir -p /home/runner/.m2/repository
           rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
+          ls -l
           mv ../packages/* /home/runner/.m2/repository
           cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
       - name: Checkout ebay-spark repo
