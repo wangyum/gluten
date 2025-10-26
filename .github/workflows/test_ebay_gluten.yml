@@ -127,7 +127,8 @@ jobs:
           mkdir -p /home/runner/.m2/repository
           rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
           ls -l
-          mv ../packages/* /home/runner/.m2/repository
+          mv io /home/runner/.m2/repository/
+          mv org /home/runner/.m2/repository/
           cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
       - name: Checkout ebay-spark repo
         uses: actions/checkout@v2
