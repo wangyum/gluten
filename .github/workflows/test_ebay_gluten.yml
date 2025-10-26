@@ -492,11 +492,10 @@ jobs:
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
           sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && \
-          yum update -y && yum install -y java-1.8.0-openjdk-devel wget && \
+          yum update -y && yum install -y jjava-17-openjdk-devel wget && \
           wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz && \
           tar -xvf apache-maven-3.8.9-bin.tar.gz && \
           mv apache-maven-3.8.9 /usr/lib/maven
-          yum install -y java-17-openjdk-devel
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
       - name: Checkout packages repo
@@ -616,12 +615,40 @@ jobs:
         with:
           name: arrow-jars-centos-7-${{github.sha}}
           path: /root/.m2/repository/org/apache/arrow/
+      - name: Setup java and maven
+        run: |
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && \
+          yum update -y && yum install -y jjava-17-openjdk-devel wget && \
+          wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz && \
+          tar -xvf apache-maven-3.8.9-bin.tar.gz && \
+          mv apache-maven-3.8.9 /usr/lib/maven
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
+      - name: Checkout packages repo
+        uses: actions/checkout@v2
+        with:
+          repository: wangyum/packages
+          ref: master
+          token: ${{ secrets.EBAY_TOKEN }}
+      - name: Install packages to $M2_REPOSITORY
+        run: |
+          mkdir -p $M2_REPOSITORY
+          rm -rf $M2_REPOSITORY/io && rm -rf $M2_REPOSITORY/org
+          mv ../packages/* $M2_REPOSITORY
+          cd $M2_REPOSITORY && find . -name "_*.repositories" | xargs rm -rf
+      - name: Checkout ebay-spark repo
+        uses: actions/checkout@v2
+        with:
+          repository: wangyum/ebay-spark
+          ref: gluten-build
+          token: ${{ secrets.EBAY_TOKEN }}
+      - name: Install ebay-spark to $M2_REPOSITORY
+        run: |
+          cd ../ebay-spark && build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
       - name: Build and Run unit test for Spark 3.5.5 (slow tests)
         run: |
           cd $GITHUB_WORKSPACE/
-          yum install -y java-17-openjdk-devel
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-          export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
           -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
