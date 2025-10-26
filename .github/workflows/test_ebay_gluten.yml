@@ -123,6 +123,7 @@ jobs:
           token: ${{ secrets.EBAY_TOKEN }}
       - name: Install packages to $M2_REPOSITORY
         run: |
+          pwd
           mkdir -p $M2_REPOSITORY
           rm -rf $M2_REPOSITORY/io && rm -rf $M2_REPOSITORY/org
           mv ../packages/* $M2_REPOSITORY
