@@ -140,6 +140,8 @@ jobs:
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         run: |
           build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          ./dev/change-scala-version.sh 2.13
+          build/mvn clean install -Pscala-2.13 -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
       - name: Save Maven cache
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         uses: actions/cache/save@v4
