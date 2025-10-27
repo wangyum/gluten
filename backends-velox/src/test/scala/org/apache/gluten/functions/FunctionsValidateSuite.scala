@@ -54,6 +54,7 @@ class FunctionsValidateSuite extends WholeStageTransformerSuite {
     val lfile = Files.createTempDirectory("temp-parquet").toFile
     lfile.deleteOnExit()
     parquetPath = lfile.getAbsolutePath
+    logWarning("yumwang: parquetPath1: " + parquetPath)
 
     val schema = StructType(
       Array(
@@ -74,6 +75,7 @@ class FunctionsValidateSuite extends WholeStageTransformerSuite {
       .format("parquet")
       .mode("overwrite")
       .parquet(parquetPath)
+    logWarning("yumwang: parquetPath2: " + parquetPath)
 
     spark.catalog.createTable("datatab", parquetPath, fileFormat)
   }
