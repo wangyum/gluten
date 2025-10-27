@@ -21,6 +21,7 @@ import org.apache.gluten.sql.shims.SparkShimLoader
 import org.apache.spark.Partition
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources.{BucketingUtils, FilePartition, HadoopFsRelation, PartitionDirectory}
 import org.apache.spark.sql.execution.datasources.FilePartition.{maxSplitBytesBySpecifiedNum, minPartitionNumBySpecifiedSize}
 import org.apache.spark.sql.types.StructType
@@ -96,19 +97,16 @@ case class PartitionsUtil(
     val splitFiles = selectedPartitions
       .flatMap {
         partition =>
-          SparkShimLoader.getSparkShims.getFileStatus(partition).flatMap {
+          partition.files.flatMap {
             file =>
-              // scalastyle:off
-              println(s"===$file===")
               // getPath() is very expensive so we only want to call it once in this block:
-              val filePath = file._1.getPath
+              val filePath = file.getPath
               if (shouldProcess(filePath)) {
                 val isSplitable =
-                  SparkShimLoader.getSparkShims.isFileSplittable(relation, filePath, requiredSchema)
-                SparkShimLoader.getSparkShims.splitFiles(
+                  relation.fileFormat.isSplitable(relation.sparkSession, relation.options, filePath)
+                PartitionedFileUtil.splitFiles(
                   sparkSession = relation.sparkSession,
-                  file = file._1,
-                  filePath = filePath,
+                  file = file,
                   isSplitable = isSplitable,
                   maxSplitBytes = maxSplitBytes,
                   partitionValues = partition.values
