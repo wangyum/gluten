@@ -437,7 +437,7 @@ class Spark35Shims extends SparkShims {
       metadata: Map[String, Any] = Map.empty): Seq[PartitionedFile] = {
     PartitionedFileUtilShim.splitFiles(
       sparkSession,
-      FileStatusWithMetadata(file, metadata),
+      new FileStatusWithMetadata(file, metadata),
       isSplitable,
       maxSplitBytes,
       partitionValues)
