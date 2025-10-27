@@ -191,7 +191,6 @@ jobs:
           path: /root/.m2/repository/org/apache/arrow/
       - name: Setup tzdata
         run: |
-          ls /root/.m2/repository
           #sed -i 's|http://archive|http://us.archive|g' /etc/apt/sources.list
           if [ "${{ matrix.os }}" = "ubuntu:22.04" ]; then
             apt-get update
