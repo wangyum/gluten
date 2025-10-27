@@ -116,8 +116,6 @@ jobs:
             m2-
       - name: Setup Java and Maven
         run: |
-          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
-          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && \
           yum update -y && yum install -y java-17-openjdk-devel wget && \
           wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz && \
           tar -xvf apache-maven-3.8.9-bin.tar.gz && \
@@ -135,6 +133,7 @@ jobs:
         if: steps.m2cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p /home/runner/.m2/repository
+          rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
           mv io /home/runner/.m2/repository/
           mv org /home/runner/.m2/repository/
           cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
