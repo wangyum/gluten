@@ -106,13 +106,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Get Ccache
+      - name: Restore Maven cache
         uses: actions/cache/restore@v4
         with:
-          path: '${{ env.CCACHE_DIR }}'
-          key: ccache-m2-repository-${{github.sha}}
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ccache-m2-repository
+            m2-
       - name: Setup java and maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
@@ -149,12 +149,12 @@ jobs:
           pwd
           ls -l
           build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
-      - name: "Save ccache"
+      - name: "Save Maven cache"
         uses: actions/cache/save@v4
         id: ccache
         with:
-          path: '${{ env.CCACHE_DIR }}'
-          key: ccache-m2-repository-${{github.sha}}
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
       - uses: actions/upload-artifact@v4
         with:
           name: m2-dependency-${{github.sha}}
