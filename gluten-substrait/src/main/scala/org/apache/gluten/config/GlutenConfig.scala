@@ -957,7 +957,7 @@ object GlutenConfig extends ConfigRegistry {
         "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
           "shuffle will be used if the number of partitions is greater than this threshold.")
       .intConf
-      .createWithDefault(0)
+      .createWithDefault(4000)
 
   val COLUMNAR_SHUFFLE_SORT_COLUMNS_THRESHOLD =
     buildConf("spark.gluten.sql.columnar.shuffle.sort.columns.threshold")
@@ -965,7 +965,7 @@ object GlutenConfig extends ConfigRegistry {
         "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
           "shuffle will be used if the number of columns is greater than this threshold.")
       .intConf
-      .createWithDefault(0)
+      .createWithDefault(100000)
 
   val COLUMNAR_TABLE_CACHE_ENABLED =
     buildStaticConf("spark.gluten.sql.columnar.tableCache")
@@ -1493,7 +1493,7 @@ object GlutenConfig extends ConfigRegistry {
     buildStaticConf("spark.gluten.storage.hdfsViewfs.enabled")
       .doc("If enabled, gluten will convert the viewfs path to hdfs path in scala side")
       .booleanConf
-      .createWithDefault(true)
+      .createWithDefault(false)
 
   val ENCRYPTED_PARQUET_FALLBACK_ENABLED =
     buildConf("spark.gluten.sql.fallbackEncryptedParquet")
