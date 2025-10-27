@@ -99,7 +99,7 @@ case class PartitionsUtil(
           SparkShimLoader.getSparkShims.getFileStatus(partition).flatMap {
             file =>
               // scalastyle:off
-              println(s"===${file}===")
+              println(s"===$file===")
               // getPath() is very expensive so we only want to call it once in this block:
               val filePath = file._1.getPath
               if (shouldProcess(filePath)) {
