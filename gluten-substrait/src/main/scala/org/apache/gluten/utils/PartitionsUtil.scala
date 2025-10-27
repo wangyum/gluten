@@ -111,8 +111,7 @@ case class PartitionsUtil(
                   filePath = filePath,
                   isSplitable = isSplitable,
                   maxSplitBytes = maxSplitBytes,
-                  partitionValues = partition.values,
-                  metadata = file._2
+                  partitionValues = partition.values
                 )
               } else {
                 Seq.empty
