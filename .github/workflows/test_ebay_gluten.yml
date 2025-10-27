@@ -107,13 +107,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Restore Maven cache
+        id: m2cache
         uses: actions/cache/restore@v4
         with:
           path: /home/runner/.m2/repository
           key: m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             m2-
-      - name: Setup java and maven
+      - name: Setup Java and Maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
           sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* && \
@@ -124,40 +125,39 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
       - name: Checkout packages repo
-        uses: actions/checkout@v2
+        if: steps.m2cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
         with:
           repository: wangyum/packages
           ref: master
           token: ${{ secrets.EBAY_TOKEN }}
-      - name: Install packages to /home/runner/.m2/repository
+      - name: Install packages
+        if: steps.m2cache.outputs.cache-hit != 'true'
         run: |
-          pwd
           mkdir -p /home/runner/.m2/repository
-          rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
-          ls -l
           mv io /home/runner/.m2/repository/
           mv org /home/runner/.m2/repository/
           cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
       - name: Checkout ebay-spark repo
-        uses: actions/checkout@v2
+        if: steps.m2cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
         with:
           repository: wangyum/ebay-spark
           ref: gluten-build
           token: ${{ secrets.EBAY_TOKEN }}
-      - name: Install ebay-spark to /home/runner/.m2/repository
+      - name: Install ebay-spark
+        if: steps.m2cache.outputs.cache-hit != 'true'
         run: |
-          pwd
-          ls -l
           build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
-      - name: "Save Maven cache"
+      - name: Save Maven cache
+        if: steps.m2cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
-        id: ccache
         with:
           path: /home/runner/.m2/repository
           key: m2-${{ hashFiles('**/pom.xml') }}
       - uses: actions/upload-artifact@v4
         with:
-          name: m2-dependency-${{github.sha}}
+          name: m2-dependency-${{ github.sha }}
           path: /home/runner/.m2/repository
           if-no-files-found: error
 
