@@ -1129,6 +1129,7 @@
         <activeByDefault>true</activeByDefault>
       </activation>
       <properties>
+        <scala.version>2.12.18</scala.version>
         <sparkbundle.version>3.5</sparkbundle.version>
         <spark.plain.version>35</spark.plain.version>
         <sparkshim.artifactId>spark-sql-columnar-shims-spark35</sparkshim.artifactId>
