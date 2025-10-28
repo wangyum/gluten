@@ -23,6 +23,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, SQLConfHelper}
 import org.apache.spark.sql.catalyst.analysis.CastSupport
 import org.apache.spark.sql.catalyst.expressions.Literal
+import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources.{FilePartition, PartitionDirectory}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.DataType
@@ -135,18 +136,15 @@ class HivePartitionConverter(hadoopConf: Configuration, session: SparkSession)
     val maxSplitBytes = FilePartition.maxSplitBytes(session, selectedPartitions)
     val splitFiles = selectedPartitions.flatMap {
       partition =>
-        SparkShimLoader.getSparkShims
-          .getFileStatus(partition)
+        partition.files
           .flatMap {
             f =>
-              SparkShimLoader.getSparkShims.splitFiles(
+              PartitionedFileUtil.splitFiles(
                 session,
-                f._1,
-                f._1.getPath,
-                isSplitable = canBeSplit(f._1.getPath),
+                f,
+                canBeSplit(f.fileStatus.getPath),
                 maxSplitBytes,
-                partition.values,
-                f._2
+                partition.values
               )
           }
           .sortBy(_.length)(implicitly[Ordering[Long]].reverse)
