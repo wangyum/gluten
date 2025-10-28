@@ -180,6 +180,7 @@ class MiscOperatorSuite extends VeloxWholeStageTransformerSuite with AdaptiveSpa
     val df = runQueryAndCompare(
       "select l_orderkey from lineitem where l_orderkey > 2 " +
         "and l_orderkey = 1") { _ => }
+    df.show()
     assert(df.isEmpty)
     df.explain("cost")
     checkLengthAndPlan(df, 0)
