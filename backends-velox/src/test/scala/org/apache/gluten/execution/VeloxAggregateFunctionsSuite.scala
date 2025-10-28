@@ -592,6 +592,7 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
                           |""".stripMargin) {
       df =>
         {
+          df.explain("cost")
           assert(
             getExecutedPlan(df).count(
               plan => {
