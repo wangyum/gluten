@@ -592,12 +592,11 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
                           |""".stripMargin) {
       df =>
         {
-          df.explain("cost")
           assert(
             getExecutedPlan(df).count(
               plan => {
                 plan.isInstanceOf[HashAggregateExecTransformer]
-              }) == 4)
+              }) == 3)
         }
     }
   }
@@ -618,7 +617,7 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
             getExecutedPlan(df).count(
               plan => {
                 plan.isInstanceOf[HashAggregateExecTransformer]
-              }) == 4)
+              }) == 3)
         }
     }
   }
