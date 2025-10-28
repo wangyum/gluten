@@ -38,7 +38,10 @@ on:
       - 'ep/build-velox/**'
       - 'cpp/**'
       - 'dev/**'
-
+  push:
+    branch:
+      - main
+      - and-pushdown*
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   MVN_CMD: 'mvn -ntp'
