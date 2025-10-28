@@ -180,6 +180,7 @@ class MiscOperatorSuite extends VeloxWholeStageTransformerSuite with AdaptiveSpa
       "select l_orderkey from lineitem where l_orderkey > 2 " +
         "and l_orderkey = 1") { _ => }
     assert(df.isEmpty)
+    df.explain("cost")
     checkLengthAndPlan(df, 0)
   }
 
