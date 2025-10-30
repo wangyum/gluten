@@ -49,6 +49,7 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
       .set("spark.unsafe.exceptionOnMemoryLeak", "true")
       .set("spark.sql.autoBroadcastJoinThreshold", "-1")
       .set("spark.sql.sources.useV1SourceList", "avro")
+      .set("spark.sql.execution.combineAdjacentAggregation", "false")
       .set(GlutenConfig.MERGE_TWO_PHASES_ENABLED.key, "false")
   }
 
@@ -596,7 +597,7 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
             getExecutedPlan(df).count(
               plan => {
                 plan.isInstanceOf[HashAggregateExecTransformer]
-              }) == 3)
+              }) == 4)
         }
     }
   }
@@ -617,7 +618,7 @@ abstract class VeloxAggregateFunctionsSuite extends VeloxWholeStageTransformerSu
             getExecutedPlan(df).count(
               plan => {
                 plan.isInstanceOf[HashAggregateExecTransformer]
-              }) == 3)
+              }) == 4)
         }
     }
   }
