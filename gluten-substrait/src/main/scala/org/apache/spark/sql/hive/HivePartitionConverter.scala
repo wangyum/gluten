@@ -141,7 +141,7 @@ class HivePartitionConverter(hadoopConf: Configuration, session: SparkSession)
               PartitionedFileUtil.splitFiles(
                 session,
                 f,
-                canBeSplit(f.fileStatus.getPath),
+                canBeSplit(f.getPath),
                 maxSplitBytes,
                 partition.values
               )
