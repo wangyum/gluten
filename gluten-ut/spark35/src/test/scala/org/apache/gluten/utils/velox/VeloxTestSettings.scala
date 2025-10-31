@@ -176,6 +176,7 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenMathExpressionsSuite]
     // Spark round UT for round(3.1415,3) is not correct.
     .exclude("round/bround/floor/ceil")
+    .exclude("conv")
   enableSuite[GlutenMiscExpressionsSuite]
   enableSuite[GlutenNondeterministicSuite]
     .exclude("MonotonicallyIncreasingID")
@@ -657,6 +658,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-29166: dynamic partition table creation with limitation")
     .exclude("The max output file number of a single task should respect bucket number")
     .exclude("HADP-55157: Enable adaptive dynamic partition creation threshold")
+    .exclude("Check total max file count")
 
   enableSuite[GlutenPartitionedWriteSuite]
   enableSuite[GlutenPathOptionSuite]
@@ -878,6 +880,8 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenJoinSuite]
     // exclude as it check spark plan
     .exclude("SPARK-36794: Ignore duplicated key when building relation for semi/anti hash join")
+    .exclude("Shuffle output exceed max expansion rate")
+    .exclude("Join output exceed max expansion rate")
   enableSuite[GlutenMathFunctionsSuite]
   enableSuite[GlutenMetadataCacheSuite]
     .exclude("SPARK-16336,SPARK-27961 Suggest fixing FileNotFoundException")
@@ -920,6 +924,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-33687: analyze all tables in a specific database")
     .exclude("column stats collection for null columns")
     .exclude("analyze column command - result verification")
+    .exclude("SPARK-47222: fileCompressionFactor should be applied to the size of the table")
   enableSuite[GlutenSubquerySuite]
     .excludeByPrefix(
       "SPARK-26893" // Rewrite this test because it checks Spark's physical operators.

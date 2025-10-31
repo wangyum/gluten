@@ -44,6 +44,8 @@ class GlutenInsertSuite
 
   override def sparkConf: SparkConf = {
     super.sparkConf.set("spark.sql.leafNodeDefaultParallelism", "1")
+    // TODO: Support write with customer partition path
+    super.sparkConf.set("spark.sql.dynamicPartitionOverwrite.lock.skipped", "true")
   }
 
   override def beforeAll(): Unit = {
