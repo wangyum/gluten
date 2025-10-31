@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.execution.{BatchScanExecTransformer, FileSourceScanExecTransformer, FilterExecTransformerBase}
+import org.apache.gluten.expression.VeloxBloomFilterMightContain
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.expressions.{DynamicPruningExpression, Expression}
@@ -236,6 +237,7 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     val dpExprs = collectDynamicPruningExpressions(plan)
     val hasSubquery = dpExprs.exists {
       case InSubqueryExec(_, _: SubqueryExec, _, _, _, _, _) => true
+      case _: VeloxBloomFilterMightContain => true
       case _ => false
     }
     val subqueryBroadcast = dpExprs.collect {

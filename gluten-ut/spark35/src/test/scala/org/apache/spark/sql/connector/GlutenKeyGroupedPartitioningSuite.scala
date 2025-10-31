@@ -18,6 +18,7 @@ package org.apache.spark.sql.connector
 
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.execution.SortMergeJoinExecTransformer
+
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{GlutenSQLTestsBaseTrait, Row}
 import org.apache.spark.sql.connector.catalog.{Identifier, InMemoryTableCatalog}
@@ -45,19 +46,13 @@ class GlutenKeyGroupedPartitioningSuite
   }
 
   override def collectAllShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
-    collect(plan) {
-      case s: ColumnarShuffleExchangeExec => s
-    }
+    collect(plan) { case s: ColumnarShuffleExchangeExec => s }
   }
 
   override def collectShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
     // here we skip collecting shuffle operators that are not associated with SMJ
-    collect(plan) {
-      case s: SortMergeJoinExecTransformer => s
-    }.flatMap(smj =>
-      collect(smj) {
-        case s: ColumnarShuffleExchangeExec => s
-      })
+    collect(plan) { case s: SortMergeJoinExecTransformer => s }.flatMap(
+      smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
   }
 
   private val emptyProps: java.util.Map[String, String] = {
