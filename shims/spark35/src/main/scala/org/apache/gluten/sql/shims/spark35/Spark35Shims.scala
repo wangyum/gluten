@@ -468,7 +468,6 @@ class Spark35Shims extends SparkShims {
     batchScan.spjParams.commonPartitionValues
   }
 
-  // please ref BatchScanExec::inputRDD
   override def orderPartitions(
       batchScan: DataSourceV2ScanExecBase,
       scan: Scan,

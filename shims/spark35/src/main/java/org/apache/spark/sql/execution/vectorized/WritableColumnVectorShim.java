@@ -36,10 +36,7 @@ public class WritableColumnVectorShim extends WritableColumnVector {
     super(capacity, type);
   }
 
-  @Override
-  protected void releaseMemory() {
-    // TODO: Release Memory
-  }
+  protected void releaseMemory() {}
 
   @Override
   public int getDictId(int rowId) {

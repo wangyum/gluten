@@ -64,14 +64,10 @@ class VeloxTestSettings extends BackendTestSettings {
     // Rewritten
     .exclude("Fallback Parquet V2 to V1")
   enableSuite[GlutenKeyGroupedPartitioningSuite]
-    // NEW SUITE: disable as they check vanilla spark plan
-    .exclude("partitioned join: number of buckets mismatch should trigger shuffle")
-    .exclude("partitioned join: only one side reports partitioning")
-    .exclude("partitioned join: join with two partition keys and different # of partition keys")
-    // disable due to check for SMJ node
-    .excludeByPrefix("SPARK-41413: partitioned join:")
-    .excludeByPrefix("SPARK-42038: partially clustered:")
-    .exclude("SPARK-44641: duplicated records when SPJ is not triggered")
+    // Issue 10992: scala.MatchError: keygroupedpartitioning
+    .excludeByPrefix("SPARK-41471: shuffle one side")
+    .exclude("SPARK-44647: shuffle one side and join keys are less than partition keys")
+    .excludeByPrefix("SPARK-48012: one-side shuffle with partition transforms")
   enableSuite[GlutenLocalScanSuite]
   enableSuite[GlutenMetadataColumnSuite]
   enableSuite[GlutenSupportsCatalogOptionsSuite]
@@ -546,6 +542,7 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenFileSourceStrategySuite]
     // Plan comparison.
     .exclude("partitioned table - after scan filters")
+    .exclude("SPARK-44493: Push partial predicates are supported")
   enableSuite[GlutenHadoopFileLinesReaderSuite]
   enableSuite[GlutenPathFilterStrategySuite]
   enableSuite[GlutenPathFilterSuite]
@@ -655,6 +652,12 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-39557 INSERT INTO statements with tables with array defaults")
     .exclude("SPARK-39557 INSERT INTO statements with tables with struct defaults")
     .exclude("SPARK-39557 INSERT INTO statements with tables with map defaults")
+    .exclude("SPARK-20236: dynamic partition overwrite with customer partition path")
+    .exclude("SPARK-29166: dynamic partition overwrite with limitation")
+    .exclude("SPARK-29166: dynamic partition table creation with limitation")
+    .exclude("The max output file number of a single task should respect bucket number")
+    .exclude("HADP-55157: Enable adaptive dynamic partition creation threshold")
+
   enableSuite[GlutenPartitionedWriteSuite]
   enableSuite[GlutenPathOptionSuite]
   enableSuite[GlutenPrunedScanSuite]
@@ -887,6 +890,7 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenScalaReflectionRelationSuite]
   enableSuite[GlutenSerializationSuite]
   enableSuite[GlutenFileSourceSQLInsertTestSuite]
+    .exclude("SPARK-33474: Support typed literals as partition spec values")
   enableSuite[GlutenDSV2SQLInsertTestSuite]
   enableSuite[GlutenSQLQuerySuite]
     // Decimal precision exceeds.

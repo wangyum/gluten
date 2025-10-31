@@ -18,7 +18,6 @@ package org.apache.spark.sql.connector
 
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.execution.SortMergeJoinExecTransformer
-
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{GlutenSQLTestsBaseTrait, Row}
 import org.apache.spark.sql.connector.catalog.{Identifier, InMemoryTableCatalog}
@@ -27,6 +26,7 @@ import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, ide
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.execution.exchange.ShuffleExchangeLike
 import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -42,6 +42,22 @@ class GlutenKeyGroupedPartitioningSuite
       .set(GlutenConfig.COLUMNAR_FORCE_SHUFFLED_HASH_JOIN_ENABLED.key, "false")
       .set("spark.sql.adaptive.enabled", "false")
       .set("spark.sql.shuffle.partitions", "5")
+  }
+
+  override def collectAllShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
+    collect(plan) {
+      case s: ColumnarShuffleExchangeExec => s
+    }
+  }
+
+  override def collectShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
+    // here we skip collecting shuffle operators that are not associated with SMJ
+    collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+    }.flatMap(smj =>
+      collect(smj) {
+        case s: ColumnarShuffleExchangeExec => s
+      })
   }
 
   private val emptyProps: java.util.Map[String, String] = {
