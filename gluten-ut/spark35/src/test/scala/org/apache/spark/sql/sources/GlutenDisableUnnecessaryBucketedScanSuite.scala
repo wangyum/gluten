@@ -30,7 +30,9 @@ class GlutenDisableUnnecessaryBucketedScanWithoutHiveSupportSuiteAE
     val df = sql(query)
     df.collect()
     val plan = df.queryExecution.executedPlan
-    val bucketedScan = collect(plan) { case s: FileSourceScanExecTransformer if s.bucketedScan => s }
+    val bucketedScan = collect(plan) {
+      case s: FileSourceScanExecTransformer if s.bucketedScan => s
+    }
     assert(bucketedScan.length == expectedNumBucketedScan)
   }
 }
