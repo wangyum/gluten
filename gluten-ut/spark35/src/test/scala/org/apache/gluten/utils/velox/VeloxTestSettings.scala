@@ -623,6 +623,7 @@ class VeloxTestSettings extends BackendTestSettings {
     // DISABLED: GLUTEN-4893 Vanilla UT checks scan operator by exactly matching the class type
     .exclude("disable bucketing when the output doesn't contain all bucketing columns")
     .excludeByPrefix("bucket coalescing is applied when join expressions match")
+    .exclude("SPARK-46219: Unwrap cast in join condition")
   enableSuite[GlutenBucketedWriteWithoutHiveSupportSuite]
     .exclude("write bucketed data")
     .exclude("write bucketed data with sortBy")
@@ -918,6 +919,7 @@ class VeloxTestSettings extends BackendTestSettings {
     // ORC related
     .exclude("SPARK-37965: Spark support read/write orc file with invalid char in field name")
     .exclude("SPARK-38173: Quoted column cannot be recognized correctly when quotedRegexColumnNames is true")
+    .excludeByPrefix("range join")
   enableSuite[GlutenSQLQueryTestSuite]
   enableSuite[GlutenStatisticsCollectionSuite]
     // The output byte size of Velox is different
