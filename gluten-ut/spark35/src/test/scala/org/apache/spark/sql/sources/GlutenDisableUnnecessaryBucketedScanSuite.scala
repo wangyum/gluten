@@ -17,6 +17,7 @@
 package org.apache.spark.sql.sources
 
 import org.apache.gluten.execution.FileSourceScanExecTransformer
+
 import org.apache.spark.sql.GlutenSQLTestsBaseTrait
 
 class GlutenDisableUnnecessaryBucketedScanWithoutHiveSupportSuite
