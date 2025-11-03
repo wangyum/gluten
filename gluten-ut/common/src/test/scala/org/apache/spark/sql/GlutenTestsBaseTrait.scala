@@ -60,7 +60,8 @@ trait GlutenTestsBaseTrait extends AnyFunSuiteLike with Logging {
   override protected def test(testName: String, testTags: Tag*)(testFun: => Any)(implicit
       pos: Position): Unit = {
     if (shouldRun(testName)) {
-      logWarning(s"Test $testName in ${this.getClass.getCanonicalName} is enabled.")
+      // scalastyle:off
+      println(s"Test $testName in ${this.getClass.getCanonicalName} is enabled.")
       super.test(testName, testTags: _*)(testFun)
     } else {
       super.ignore(testName, testTags: _*)(testFun)

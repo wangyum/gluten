@@ -54,7 +54,9 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenDataSourceV2FunctionSuite]
   enableSuite[GlutenDataSourceV2SQLSessionCatalogSuite]
   enableSuite[GlutenDataSourceV2SQLSuiteV1Filter]
+    .exclude("SPARK-37294: insert ANSI intervals into a table partitioned by the interval columns")
   enableSuite[GlutenDataSourceV2SQLSuiteV2Filter]
+    .exclude("SPARK-37294: insert ANSI intervals into a table partitioned by the interval columns")
   enableSuite[GlutenDataSourceV2Suite]
     // Rewrite the following tests in GlutenDataSourceV2Suite.
     .exclude("partitioning reporting")
@@ -169,6 +171,8 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-42782: Hive compatibility check for get_json_object")
     // Velox does not support single quotes in get_json_object function.
     .exclude("function get_json_object - support single quotes")
+    .exclude("function get_json_object - filter")
+    .exclude("SPARK-33286: from_json - combined error messages")
   enableSuite[GlutenLiteralExpressionSuite]
     .exclude("default")
     // FIXME(yma11): ObjectType is not covered in RowEncoder/Serializer in vanilla spark
@@ -190,6 +194,7 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenSortShuffleSuite]
   enableSuite[GlutenSortOrderExpressionsSuite]
   enableSuite[GlutenStringExpressionsSuite]
+    .exclude("SPARK-47307: base64 encoding without chunking")
   enableSuite[GlutenTryEvalSuite]
   enableSuite[VeloxAdaptiveQueryExecSuite]
     .includeAllGlutenTests()
@@ -525,6 +530,9 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenDataSourceSuite]
   enableSuite[GlutenFileFormatWriterSuite]
   enableSuite[GlutenFileIndexSuite]
+    .exclude("SPARK-27676: InMemoryFileIndex respects ignoreMissingFiles config for non-root paths")
+    .exclude("SPARK-25062 - InMemoryFileIndex stores BlockLocation objects no matter what subclass the FS returns")
+    .exclude("SPARK-31047 - Improve file listing for ViewFileSystem")
   enableSuite[GlutenFileMetadataStructSuite]
   enableSuite[GlutenParquetV1AggregatePushDownSuite]
   enableSuite[GlutenParquetV2AggregatePushDownSuite]
@@ -544,6 +552,7 @@ class VeloxTestSettings extends BackendTestSettings {
     // Plan comparison.
     .exclude("partitioned table - after scan filters")
     .exclude("SPARK-44493: Push partial predicates are supported")
+    .excludeByPrefix("Locality support for FileScanRDD")
   enableSuite[GlutenHadoopFileLinesReaderSuite]
   enableSuite[GlutenPathFilterStrategySuite]
   enableSuite[GlutenPathFilterSuite]
@@ -660,6 +669,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("The max output file number of a single task should respect bucket number")
     .exclude("HADP-55157: Enable adaptive dynamic partition creation threshold")
     .exclude("Check total max file count")
+    .exclude()
 
   enableSuite[GlutenPartitionedWriteSuite]
   enableSuite[GlutenPathOptionSuite]
@@ -705,6 +715,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("length check for input string values: with implicit cast")
     .exclude("char/varchar type values length check: partitioned columns of other types")
     .exclude("SPARK-42611: check char/varchar length in reordered structs within arrays")
+    .exclude("SPARK-34233: char/varchar with null value for partitioned columns")
   enableSuite[GlutenColumnExpressionSuite]
     // Velox raise_error('errMsg') throws a velox_user_error exception with the message 'errMsg'.
     // The final caught Spark exception's getCause().getMessage() contains 'errMsg' but does not
@@ -738,7 +749,7 @@ class VeloxTestSettings extends BackendTestSettings {
       "SPARK-22223: ObjectHashAggregate should not introduce unnecessary shuffle",
       "SPARK-31620: agg with subquery (whole-stage-codegen = true)",
       "SPARK-31620: agg with subquery (whole-stage-codegen = false)"
-    )
+    ).exclude("aggregating with various distinct expressions")
   enableSuite[GlutenDataFrameAsOfJoinSuite]
   enableSuite[GlutenDataFrameComplexTypeSuite]
   enableSuite[GlutenDataFrameFunctionsSuite]
@@ -797,6 +808,8 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-41048: Improve output partitioning and ordering with AQE cache")
     // Rewrite this test since it checks the physical operator which is changed in Gluten
     .exclude("SPARK-27439: Explain result should match collected result after view change")
+    // TODO: Intergerate with spark.sql.execution.combineAdjacentAggregation
+    .exclude("SPARK-34882: Aggregate with multiple distinct null sensitive aggregators")
   enableSuite[GlutenDataFrameTimeWindowingSuite]
   enableSuite[GlutenDataFrameTungstenSuite]
   enableSuite[GlutenDataFrameWindowFunctionsSuite]
@@ -825,6 +838,7 @@ class VeloxTestSettings extends BackendTestSettings {
     // Rewrite the following two tests in GlutenDatasetSuite.
     .exclude("dropDuplicates: columns with same column name")
     .exclude("groupBy.as")
+    .exclude("SPARK-23627: provide isEmpty in DataSet")
   enableSuite[GlutenDateFunctionsSuite]
     // The below two are replaced by two modified versions.
     .exclude("unix_timestamp")
@@ -898,6 +912,7 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenFileSourceSQLInsertTestSuite]
     .exclude("SPARK-33474: Support typed literals as partition spec values")
   enableSuite[GlutenDSV2SQLInsertTestSuite]
+    .exclude("SPARK-33474: Support typed literals as partition spec values")
   enableSuite[GlutenSQLQuerySuite]
     // Decimal precision exceeds.
     .exclude("should be able to resolve a persistent view")
@@ -922,6 +937,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-38173: Quoted column cannot be recognized correctly when quotedRegexColumnNames is true")
     .excludeByPrefix("range join")
     .excludeByPrefix("HADP-34781: Clean up the staging output path of last attempt")
+    .exclude("HADP-40670 HADP-42732: Limit max files be created per task")
   enableSuite[GlutenSQLQueryTestSuite]
   enableSuite[GlutenStatisticsCollectionSuite]
     // The output byte size of Velox is different

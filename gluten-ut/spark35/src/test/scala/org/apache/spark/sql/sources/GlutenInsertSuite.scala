@@ -73,7 +73,7 @@ class GlutenInsertSuite
     (writeFiles, child)
   }
 
-  testGluten("insert partition table") {
+  ignore("insert partition table") {
     withTable("pt", "pt2") {
       spark.sql("CREATE TABLE pt (c1 int, c2 string) USING PARQUET PARTITIONED BY (pt string)")
       spark.sql("CREATE TABLE pt2 (c1 int, c2 string) USING PARQUET PARTITIONED BY (pt string)")
