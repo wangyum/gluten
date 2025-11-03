@@ -671,6 +671,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("HADP-55157: Enable adaptive dynamic partition creation threshold")
     .exclude("Check total max file count")
     .exclude("SPARK-36980: Insert support query with CTE")
+    .exclude("SPARK-37294: insert ANSI intervals into a table partitioned by the interval columns")
 
   enableSuite[GlutenPartitionedWriteSuite]
   enableSuite[GlutenPathOptionSuite]
