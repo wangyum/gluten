@@ -531,7 +531,8 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenFileFormatWriterSuite]
   enableSuite[GlutenFileIndexSuite]
     .exclude("SPARK-27676: InMemoryFileIndex respects ignoreMissingFiles config for non-root paths")
-    .exclude("SPARK-25062 - InMemoryFileIndex stores BlockLocation objects no matter what subclass the FS returns")
+    .exclude(
+      "SPARK-25062 - InMemoryFileIndex stores BlockLocation objects no matter what subclass the FS returns")
     .exclude("SPARK-31047 - Improve file listing for ViewFileSystem")
   enableSuite[GlutenFileMetadataStructSuite]
   enableSuite[GlutenParquetV1AggregatePushDownSuite]
@@ -749,7 +750,8 @@ class VeloxTestSettings extends BackendTestSettings {
       "SPARK-22223: ObjectHashAggregate should not introduce unnecessary shuffle",
       "SPARK-31620: agg with subquery (whole-stage-codegen = true)",
       "SPARK-31620: agg with subquery (whole-stage-codegen = false)"
-    ).exclude("aggregating with various distinct expressions")
+    )
+    .exclude("aggregating with various distinct expressions")
   enableSuite[GlutenDataFrameAsOfJoinSuite]
   enableSuite[GlutenDataFrameComplexTypeSuite]
   enableSuite[GlutenDataFrameFunctionsSuite]
