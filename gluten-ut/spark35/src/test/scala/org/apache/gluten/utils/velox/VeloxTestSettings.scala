@@ -692,6 +692,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("length check for input string values: nested in struct of array")
     .exclude("length check for input string values: with implicit cast")
     .exclude("char/varchar type values length check: partitioned columns of other types")
+    .exclude("SPARK-34233: char/varchar with null value for partitioned columns")
   enableSuite[GlutenDSV2CharVarcharTestSuite]
     // Following tests are excluded as these are overridden in Gluten test suite..
     // The overridden tests assert against Velox-specific error messages for char/varchar
@@ -920,6 +921,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-37965: Spark support read/write orc file with invalid char in field name")
     .exclude("SPARK-38173: Quoted column cannot be recognized correctly when quotedRegexColumnNames is true")
     .excludeByPrefix("range join")
+    .excludeByPrefix("HADP-34781: Clean up the staging output path of last attempt")
   enableSuite[GlutenSQLQueryTestSuite]
   enableSuite[GlutenStatisticsCollectionSuite]
     // The output byte size of Velox is different

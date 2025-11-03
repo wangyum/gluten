@@ -18,13 +18,14 @@ package org.apache.spark.sql
 
 import org.apache.gluten.utils.BackendTestSettings
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.GlutenTestConstants.GLUTEN_TEST
 
 import org.scalactic.source.Position
 import org.scalatest.Tag
 import org.scalatest.funsuite.AnyFunSuiteLike
 
-trait GlutenTestsBaseTrait extends AnyFunSuiteLike {
+trait GlutenTestsBaseTrait extends AnyFunSuiteLike with Logging {
 
   protected val rootPath: String = getClass.getResource("/").getPath
   protected val basePath: String = rootPath + "unit-tests-working-home"
@@ -59,6 +60,7 @@ trait GlutenTestsBaseTrait extends AnyFunSuiteLike {
   override protected def test(testName: String, testTags: Tag*)(testFun: => Any)(implicit
       pos: Position): Unit = {
     if (shouldRun(testName)) {
+      logWarning(s"Test $testName in ${this.getClass.getCanonicalName} is enabled.")
       super.test(testName, testTags: _*)(testFun)
     } else {
       super.ignore(testName, testTags: _*)(testFun)
