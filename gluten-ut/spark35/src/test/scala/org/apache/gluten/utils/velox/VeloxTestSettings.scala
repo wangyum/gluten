@@ -670,7 +670,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("The max output file number of a single task should respect bucket number")
     .exclude("HADP-55157: Enable adaptive dynamic partition creation threshold")
     .exclude("Check total max file count")
-    .exclude()
+    .exclude("SPARK-36980: Insert support query with CTE")
 
   enableSuite[GlutenPartitionedWriteSuite]
   enableSuite[GlutenPathOptionSuite]
