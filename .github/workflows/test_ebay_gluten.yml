@@ -723,10 +723,10 @@ jobs:
           export MAVEN_HOME=/usr/lib/maven
           export PATH=${PATH}:${MAVEN_HOME}/bin
           export SPARK_SCALA_VERSION=2.13
-          mvn clean install -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Dceleborn.version=0.6.1.0.1.0 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          mvn clean install -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Dceleborn.version=0.6.1.0.0.0 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           sed -i.bak '/<parent>/,/<\/parent>/d' pom.xml
           sed -i 's/<artifactId>gluten-package_2\.12<\/artifactId>/<artifactId>gluten-package_2\.13<\/artifactId>/' package/pom.xml
-          mvn -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Dceleborn.version=0.6.1.0.1.0 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          mvn -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Dceleborn.version=0.6.1.0.0.0 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           ls -lh package/target/
           md5sum package/target/gluten-velox-bundle-spark3.5*
         env:
