@@ -1,0 +1,69 @@
+name: Auto Rebase Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to rebase onto upstream/main
+        required: true
+        default: ebay-build-20251029
+  schedule:
+    - cron: '0 3 * * *'  # daily at 03:00 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-rebase-${{ github.event.inputs.target_branch || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        branch: [ ${{ github.event.inputs.target_branch || 'ebay-build-20251029' }} ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ matrix.branch }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure upstream remote
+        run: |
+          if git remote | grep -q '^upstream$'; then
+            git remote set-url upstream https://github.com/apache/incubator-gluten.git
+          else
+            git remote add upstream https://github.com/apache/incubator-gluten.git
+          fi
+          git fetch upstream main --prune
+
+      - name: Rebase onto upstream/main
+        run: |
+          BRANCH="${{ matrix.branch }}"
+          git checkout "$BRANCH"
+          BEFORE_SHA=$(git rev-parse HEAD)
+          set -e
+          if git merge-base --is-ancestor upstream/main "$BRANCH"; then
+            echo "Branch already contains upstream/main."
+          fi
+          git rebase upstream/main || { echo "Rebase conflict. Aborting."; git rebase --abort; exit 1; }
+          AFTER_SHA=$(git rev-parse HEAD)
+          if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+            echo "No changes after rebase."
+            exit 0
+          fi
+          # Push with lease to avoid overwriting external updates
+          git push --force-with-lease origin "$BRANCH"
+          echo "Rebased and pushed: $BEFORE_SHA -> $AFTER_SHA"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Rebase job finished for branch ${{ matrix.branch }}"
