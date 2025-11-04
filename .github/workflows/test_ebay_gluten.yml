@@ -620,11 +620,15 @@ jobs:
           mv apache-maven-3.8.9 /usr/lib/maven
       - name: Build for Spark ${{ matrix.spark }}
         run: |
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
           java -version
           cd $GITHUB_WORKSPACE/
           $MVN_CMD clean install -Pjava-17 -P${{ matrix.spark }} -Pbackends-velox -Pceleborn -DskipTests
       - name: TPC-H SF1.0 && TPC-DS SF1.0 Parquet local ${{ matrix.spark }} with ${{ matrix.celeborn }}
         run: |
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
           java -version
           EXTRA_PROFILE=""
           if [ "${{ matrix.celeborn }}" = "celeborn-0.4.3" ]; then
