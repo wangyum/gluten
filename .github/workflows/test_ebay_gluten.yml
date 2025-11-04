@@ -582,6 +582,72 @@ jobs:
             **/gluten-ut/**/hs_err_*.log
             **/gluten-ut/**/core.*
 
+  tpc-test-ubuntu-2204-celeborn:
+    needs: [build-native-lib-centos-7, build-internal-dependency]
+    strategy:
+      fail-fast: false
+      matrix:
+        spark: [ "spark-3.5" ]
+        celeborn: [ "celeborn-0.6.1"]
+    runs-on: ubuntu-22.04
+    container: apache/gluten:centos-8-jdk8
+    steps:
+      - uses: actions/checkout@v2
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: velox-native-lib-centos-7-${{github.sha}}
+          path: ./cpp/build/releases
+      - name: Download m2 dependency
+        uses: actions/download-artifact@v4
+        with:
+          name: m2-dependency-${{github.sha}}
+          path: /root/.m2/repository
+      - name: Download Arrow Jars
+        uses: actions/download-artifact@v4
+        with:
+          name: arrow-jars-centos-7-${{github.sha}}
+          path: /root/.m2/repository/org/apache/arrow/
+      - name: Build for Spark ${{ matrix.spark }}
+        run: |
+          cd $GITHUB_WORKSPACE/
+          $MVN_CMD clean install -P${{ matrix.spark }} -Pbackends-velox -Pceleborn -DskipTests
+      - name: TPC-H SF1.0 && TPC-DS SF1.0 Parquet local spark3.2 with ${{ matrix.celeborn }}
+        run: |
+          EXTRA_PROFILE=""
+          if [ "${{ matrix.celeborn }}" = "celeborn-0.4.3" ]; then
+            EXTRA_PROFILE="-Pceleborn-0.4"
+          elif [ "${{ matrix.celeborn }}" = "celeborn-0.5.4" ]; then
+            EXTRA_PROFILE="-Pceleborn-0.5"
+          elif [ "${{ matrix.celeborn }}" = "celeborn-0.6.1" ]; then
+            EXTRA_PROFILE="-Pceleborn-0.6"
+          fi
+          echo "EXTRA_PROFILE: ${EXTRA_PROFILE}"
+          if [ ! -e "/opt/apache-${{ matrix.celeborn }}-bin.tgz" ]; then
+            echo "WARNING: please pre-install your required package in docker image since the downloading is throttled by this site."
+            wget -nv https://archive.apache.org/dist/celeborn/${{ matrix.celeborn }}/apache-${{ matrix.celeborn }}-bin.tgz -P /opt/
+          fi
+          cd /opt && mkdir -p celeborn && \
+          tar xzf apache-${{ matrix.celeborn }}-bin.tgz -C /opt/celeborn --strip-components=1 && cd celeborn && \
+          mv ./conf/celeborn-env.sh.template ./conf/celeborn-env.sh && \
+          bash -c "echo -e 'CELEBORN_MASTER_MEMORY=4g\nCELEBORN_WORKER_MEMORY=4g\nCELEBORN_WORKER_OFFHEAP_MEMORY=8g' > ./conf/celeborn-env.sh" && \
+          bash -c "echo -e 'celeborn.worker.commitFiles.threads 128\nceleborn.worker.sortPartition.threads 64' > ./conf/celeborn-defaults.conf" && \
+          bash ./sbin/start-master.sh && bash ./sbin/start-worker.sh && \
+          cd $GITHUB_WORKSPACE/tools/gluten-it && $MVN_CMD clean install -Pspark-3.2 -Pceleborn ${EXTRA_PROFILE} && \
+          GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox-with-celeborn --benchmark-type=h --error-on-memleak --off-heap-size=10g -s=1.0 --threads=8 --iterations=1 && \
+          GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox-with-celeborn --benchmark-type=ds --error-on-memleak --off-heap-size=10g -s=1.0 --threads=8 --iterations=1 && \
+          GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox-with-celeborn --extra-conf=spark.celeborn.client.spark.shuffle.writer=sort \
+            --extra-conf=spark.celeborn.push.sortMemory.threshold=8m --benchmark-type=ds --error-on-memleak \
+            --off-heap-size=10g -s=1.0 --threads=8 --iterations=1
+          GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox-with-celeborn --extra-conf=spark.celeborn.client.spark.shuffle.writer=sort \
+            --extra-conf=spark.gluten.sql.columnar.shuffle.celeborn.useRssSort=false \
+            --extra-conf=spark.celeborn.push.sortMemory.threshold=8m --benchmark-type=ds --error-on-memleak \
+            --off-heap-size=10g -s=1.0 --threads=8 --iterations=1
+
   build-and-deploy-bundle-package-centos8:
     if: >
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[DEPLOY]')) ||
