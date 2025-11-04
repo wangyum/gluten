@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         branch:
-          - ${{ github.event.inputs.target_branch || 'ebay-build-20251029' }}
+          - ${{ github.event.inputs.target_branch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
