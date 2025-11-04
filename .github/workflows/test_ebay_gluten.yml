@@ -633,7 +633,7 @@ jobs:
           bash -c "echo -e 'CELEBORN_MASTER_MEMORY=4g\nCELEBORN_WORKER_MEMORY=4g\nCELEBORN_WORKER_OFFHEAP_MEMORY=8g' > ./conf/celeborn-env.sh" && \
           bash -c "echo -e 'celeborn.worker.commitFiles.threads 128\nceleborn.worker.sortPartition.threads 64' > ./conf/celeborn-defaults.conf" && \
           bash ./sbin/start-master.sh && bash ./sbin/start-worker.sh && \
-          cd $GITHUB_WORKSPACE/tools/gluten-it && $MVN_CMD clean install -Pspark-3.2 -Pceleborn ${EXTRA_PROFILE} && \
+          cd $GITHUB_WORKSPACE/tools/gluten-it && $MVN_CMD clean install -P${{ matrix.spark }} -Pceleborn ${EXTRA_PROFILE} && \
           GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
             --local --preset=velox-with-celeborn --benchmark-type=h --error-on-memleak --off-heap-size=10g -s=1.0 --threads=8 --iterations=1 && \
           GLUTEN_IT_JVM_ARGS=-Xmx10G sbin/gluten-it.sh queries-compare \
@@ -704,14 +704,17 @@ jobs:
           if-no-files-found: error
       - name: Build for ebay Spark 3.5 with scala 2.13
         run: |
-          cd $GITHUB_WORKSPACE/ && \
-          export MAVEN_HOME=/usr/lib/maven && \
-          export PATH=${PATH}:${MAVEN_HOME}/bin && \
-          export SPARK_SCALA_VERSION=2.13 && \
-          mvn clean install -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          yum install -y java-17-openjdk-devel
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
+          cd $GITHUB_WORKSPACE/
+          export MAVEN_HOME=/usr/lib/maven
+          export PATH=${PATH}:${MAVEN_HOME}/bin
+          export SPARK_SCALA_VERSION=2.13
+          mvn clean install -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           sed -i.bak '/<parent>/,/<\/parent>/d' pom.xml
           sed -i 's/<artifactId>gluten-package_2\.12<\/artifactId>/<artifactId>gluten-package_2\.13<\/artifactId>/' package/pom.xml
-          mvn -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          mvn -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=2.13.8 -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
           ls -lh package/target/
           md5sum package/target/gluten-velox-bundle-spark3.5*
         env:
