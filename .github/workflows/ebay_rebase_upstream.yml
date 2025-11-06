@@ -21,7 +21,7 @@ on:
       target_branch:
         description: Branch to rebase onto upstream/main
         required: true
-        default: ebay-build-20251029
+        default: main-ebay
   schedule:
     - cron: '0 3 * * *'
 
@@ -38,7 +38,7 @@ jobs:
     strategy:
       matrix:
         branch:
-          - "${{ github.event.inputs.target_branch || 'ebay-build-20251029' }}"
+          - "${{ github.event.inputs.target_branch || 'main-ebay' }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
