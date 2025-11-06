@@ -281,6 +281,7 @@ jobs:
           path: /tmp/tpch-approved-plan/**
 
   spark-test-spark35-scala213:
+    if: ${{ contains(github.event.head_commit.message, '[scala-2.13]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
     container: apache/gluten:centos-8-jdk8
@@ -583,6 +584,7 @@ jobs:
             **/gluten-ut/**/core.*
 
   tpc-test-ubuntu-2204-celeborn:
+    if: ${{ contains(github.event.head_commit.message, '[celeborn]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     strategy:
       fail-fast: false
