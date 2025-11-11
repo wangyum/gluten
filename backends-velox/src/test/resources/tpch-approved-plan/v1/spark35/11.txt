@@ -428,7 +428,7 @@ Arguments: isFinalPlan=true
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 47 Hosting Expression = Subquery subquery#X, [id=#X]
-AdaptiveSparkPlan (135)
+AdaptiveSparkPlan (134)
 +- == Final Plan ==
    VeloxColumnarToRow (113)
    +- ^ ProjectExecTransformer (111)
@@ -455,27 +455,26 @@ AdaptiveSparkPlan (135)
                   +- ShuffleQueryStage (105), Statistics(X)
                      +- ReusedExchange (104)
 +- == Initial Plan ==
-   HashAggregate (134)
-   +- HashAggregate (133)
-      +- Project (132)
-         +- SortMergeJoin Inner (131)
-            :- Sort (125)
-            :  +- Exchange (124)
-            :     +- Project (123)
-            :        +- SortMergeJoin Inner (122)
-            :           :- Sort (117)
-            :           :  +- Exchange (116)
-            :           :     +- Filter (115)
-            :           :        +- Scan parquet (114)
-            :           +- Sort (121)
-            :              +- Exchange (120)
-            :                 +- Filter (119)
-            :                    +- Scan parquet (118)
-            +- Sort (130)
-               +- Exchange (129)
-                  +- Project (128)
-                     +- Filter (127)
-                        +- Scan parquet (126)
+   HashAggregate (133)
+   +- Project (132)
+      +- SortMergeJoin Inner (131)
+         :- Sort (125)
+         :  +- Exchange (124)
+         :     +- Project (123)
+         :        +- SortMergeJoin Inner (122)
+         :           :- Sort (117)
+         :           :  +- Exchange (116)
+         :           :     +- Filter (115)
+         :           :        +- Scan parquet (114)
+         :           +- Sort (121)
+         :              +- Exchange (120)
+         :                 +- Filter (119)
+         :                    +- Scan parquet (118)
+         +- Sort (130)
+            +- Exchange (129)
+               +- Project (128)
+                  +- Filter (127)
+                     +- Scan parquet (126)
 
 
 (83) ScanTransformer parquet 
@@ -693,17 +692,10 @@ Input [4]: [ps_availqty#X, ps_supplycost#X, s_nationkey#X, n_nationkey#X]
 (133) HashAggregate
 Input [2]: [ps_availqty#X, ps_supplycost#X]
 Keys: []
-Functions [1]: [partial_sum((ps_supplycost#X * cast(ps_availqty#X as decimal(10,0))))]
-Aggregate Attributes [2]: [sum#X, isEmpty#X]
-Results [2]: [sum#X, isEmpty#X]
-
-(134) HashAggregate
-Input [2]: [sum#X, isEmpty#X]
-Keys: []
 Functions [1]: [sum((ps_supplycost#X * cast(ps_availqty#X as decimal(10,0))))]
 Aggregate Attributes [1]: [sum((ps_supplycost#X * cast(ps_availqty#X as decimal(10,0))))#X]
 Results [1]: [(sum((ps_supplycost#X * cast(ps_availqty#X as decimal(10,0))))#X * 0.0001000000) AS (sum((ps_supplycost * ps_availqty)) * 0.0001000000)#X]
 
-(135) AdaptiveSparkPlan
+(134) AdaptiveSparkPlan
 Output [1]: [(sum((ps_supplycost * ps_availqty)) * 0.0001000000)#X]
 Arguments: isFinalPlan=true

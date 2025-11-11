@@ -545,16 +545,17 @@ class VeloxStringFunctionsSuite extends VeloxWholeStageTransformerSuite {
   }
 
   testWithMinSparkVersion("split", "3.4") {
-    runQueryAndCompare(
-      s"select l_orderkey, l_comment, split(l_comment, '') " +
-        s"from $LINEITEM_TABLE limit 5") {
-      checkGlutenOperatorMatch[ProjectExecTransformer]
-    }
-    runQueryAndCompare(
-      s"select l_orderkey, l_comment, split(l_comment, '', 1) " +
-        s"from $LINEITEM_TABLE limit 5") {
-      checkGlutenOperatorMatch[ProjectExecTransformer]
-    }
+    // TODO: [HADP-58977] Revert "[SPARK-40194][SQL] SPLIT function on empty regex should ...
+    // runQueryAndCompare(
+    //   s"select l_orderkey, l_comment, split(l_comment, '') " +
+    //     s"from $LINEITEM_TABLE limit 5") {
+    //   checkGlutenOperatorMatch[ProjectExecTransformer]
+    // }
+    // runQueryAndCompare(
+    //   s"select l_orderkey, l_comment, split(l_comment, '', 1) " +
+    //     s"from $LINEITEM_TABLE limit 5") {
+    //   checkGlutenOperatorMatch[ProjectExecTransformer]
+    // }
 
     runQueryAndCompare(
       s"select l_orderkey, l_comment, split(l_comment, ',') " +
