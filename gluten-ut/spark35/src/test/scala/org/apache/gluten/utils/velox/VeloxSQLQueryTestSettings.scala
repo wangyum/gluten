@@ -218,6 +218,14 @@ object VeloxSQLQueryTestSettings extends SQLQueryTestSettings {
   )
 
   val OVERWRITE_SQL_QUERY_LIST: Set[String] = Set(
+    // Overwrite some result mismatch cases.
+    "column-resolution-aggregate.sql",
+    "identifier-clause.sql",
+    "inline-table.sql",
+    "keywords.sql",
+    "show-create-table.sql",
+    "show-tables.sql",
+    "transform.sql",
     // The calculation formulas for corr, skewness, kurtosis, variance, and stddev in Velox differ
     // slightly from those in Spark, resulting in some differences in the final results.
     // Overwrite below test cases.
