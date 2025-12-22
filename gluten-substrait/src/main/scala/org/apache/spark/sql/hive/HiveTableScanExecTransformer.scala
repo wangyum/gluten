@@ -104,7 +104,11 @@ case class HiveTableScanExecTransformer(
       hivePartitionConverter.createFilePartition(tableLocation).map((_, fileFormat))
     } else if (existsMixedInputFormat) {
       val readFileFormats = prunedPartitions.map {
-        partition => getReadFileFormat(HiveClientImpl.fromHivePartition(partition).storage)
+        partition =>
+          getReadFileFormat(
+            HiveClientImpl
+              .fromHivePartition(partition, relation.tableMeta.storage.locationUri)
+              .storage)
       }
 
       hivePartitionConverter.createFilePartition(

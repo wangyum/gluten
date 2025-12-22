@@ -152,13 +152,13 @@ abstract class CelebornColumnarShuffleWriter[K, V](
     val pushMergedDataTime = System.nanoTime
     client.prepareForMergeData(shuffleId, mapId, context.attemptNumber())
     client.pushMergedData(shuffleId, mapId, context.attemptNumber)
-    client.mapperEnd(shuffleId, mapId, context.attemptNumber, numMappers)
+    client.mapperEnd(shuffleId, mapId, context.attemptNumber, numMappers, numPartitions)
     writeMetrics.incWriteTime(System.nanoTime - pushMergedDataTime)
   }
 
   def handleEmptyIterator(): Unit = {
     partitionLengths = new Array[Long](dep.partitioner.numPartitions)
-    client.mapperEnd(shuffleId, mapId, context.attemptNumber, numMappers)
+    client.mapperEnd(shuffleId, mapId, context.attemptNumber, numMappers, numPartitions)
     mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths, mapId)
   }
 }
