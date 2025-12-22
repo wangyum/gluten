@@ -57,6 +57,8 @@ trait GlutenPlan
     rowType() != Convention.RowType.None
   }
 
+  final override val supportsVectorExecution: Boolean = true
+
   override def batchType(): Convention.BatchType
 
   override def rowType0(): Convention.RowType
