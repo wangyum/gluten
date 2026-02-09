@@ -6,8 +6,8 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
---- a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision 6a5103c30a3e99ede96e3d6c61f94680e4c95f04)
-+++ b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision c071a96208ff2d647f5f24d16eaf966710e3ceaf)
+--- a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision fa65e6d189574eb1c6c57d81ab57a56b64265547)
++++ b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision f0bde42364e5cb4a1e8fbedfebfd31ae13cf65ad)
 @@ -78,7 +78,7 @@
          "Whether to enable gluten. Default value is true. Just an experimental property." +
            " Recommend to enable/disable Gluten through the setting for spark.plugins.")
@@ -23,8 +23,8 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
---- a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision 6a5103c30a3e99ede96e3d6c61f94680e4c95f04)
-+++ b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision c071a96208ff2d647f5f24d16eaf966710e3ceaf)
+--- a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision fa65e6d189574eb1c6c57d81ab57a56b64265547)
++++ b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision f0bde42364e5cb4a1e8fbedfebfd31ae13cf65ad)
 @@ -976,7 +976,7 @@
          "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
            "shuffle will be used if the number of partitions is greater than this threshold.")
@@ -43,12 +43,12 @@ diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConf
  
    val COLUMNAR_TABLE_CACHE_ENABLED =
      buildStaticConf("spark.gluten.sql.columnar.tableCache")
-@@ -1512,7 +1512,7 @@
+@@ -1505,7 +1505,7 @@
      buildStaticConf("spark.gluten.storage.hdfsViewfs.enabled")
        .doc("If enabled, gluten will convert the viewfs path to hdfs path in scala side")
        .booleanConf
 -      .createWithDefault(false)
 +      .createWithDefault(true)
  
-   val ENCRYPTED_PARQUET_FALLBACK_ENABLED =
-     buildConf("spark.gluten.sql.fallbackEncryptedParquet")
+   val AUTO_ADJUST_STAGE_RESOURCE_PROFILE_ENABLED =
+     buildConf("spark.gluten.auto.adjustStageResource.enabled")
