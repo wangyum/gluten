@@ -1,0 +1,90 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Auto Rebase Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to rebase onto upstream/main
+        required: true
+        default: main-ebay
+  schedule:
+    - cron: '0 20 * * *'
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+  packages: write
+
+concurrency:
+  group: auto-rebase-${{ github.event.inputs.target_branch || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        branch:
+          - "${{ github.event.inputs.target_branch || 'main-ebay' }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.target_branch || 'main-ebay' }}
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config user.name "automation"
+          git config user.email "automation@users.noreply.github.com"
+
+      - name: Ensure upstream remote
+        run: |
+          git remote add upstream https://github.com/apache/incubator-gluten.git 2>/dev/null || \
+          git remote set-url upstream https://github.com/apache/incubator-gluten.git
+          git fetch upstream main --prune
+
+      - name: Set up PAT for pushing
+        run: |
+          git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/wangyum/incubator-gluten.git
+          git config credential.helper ''
+
+      - name: Rebase onto upstream/main
+        run: |
+          BRANCH="${{ matrix.branch }}"
+          git checkout "$BRANCH"
+          BEFORE_SHA=$(git rev-parse HEAD)
+          set -e
+          if git merge-base --is-ancestor upstream/main "$BRANCH"; then
+            echo "Branch already contains upstream/main."
+          fi
+          git rebase upstream/main || { echo "Rebase conflict. Aborting."; git rebase --abort; exit 1; }
+          AFTER_SHA=$(git rev-parse HEAD)
+          if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+            echo "No changes after rebase."
+            exit 0
+          fi
+          git push --force origin "$BRANCH"
+          echo "Rebased and pushed: $BEFORE_SHA -> $AFTER_SHA"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Rebase job finished for branch ${{ matrix.branch }}"
