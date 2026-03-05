@@ -32,12 +32,13 @@ case class V2WritePostRule() extends Rule[SparkPlan] {
        * guarantee to generate columnar outputs. thus avoiding the case of c2r->aqe->r2c->writer.
        */
       ensureAQESupportsColumnar(write.query)
-        .map(write.withNewQuery).getOrElse(write)
+        .map(write.withNewQuery)
+        .getOrElse(write)
 
     case v2Command: V2CommandExec =>
       /**
-       * For V2CommandExec (e.g., WriteFilesExec for planned writes), ensure its child AQE
-       * supports columnar. This is needed for proper shuffle cleanup tracking (SPARK-53413).
+       * For V2CommandExec (e.g., WriteFilesExec for planned writes), ensure its child AQE supports
+       * columnar. This is needed for proper shuffle cleanup tracking (SPARK-53413).
        */
       val newChildren = v2Command.children.map(ensureAQESupportsColumnar)
       if (newChildren.forall(_.isEmpty)) {
