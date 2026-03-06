@@ -21,7 +21,7 @@ import org.apache.gluten.execution.ColumnarV2TableWriteExec
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.datasources.v2.V2CommandExec
+import org.apache.spark.sql.execution.datasources.v2.V2TableWriteExec
 
 case class V2WritePostRule() extends Rule[SparkPlan] {
 
@@ -35,16 +35,16 @@ case class V2WritePostRule() extends Rule[SparkPlan] {
         .map(write.withNewQuery)
         .getOrElse(write)
 
-    case v2Command: V2CommandExec =>
+    case write: V2TableWriteExec =>
       /**
-       * For V2CommandExec (e.g., WriteFilesExec for planned writes), ensure its child AQE supports
-       * columnar. This is needed for proper shuffle cleanup tracking (SPARK-53413).
+       * For V2TableWriteExec (e.g., AppendDataExec, OverwriteByExpressionExec), ensure its child
+       * AQE supports columnar. This is needed for proper shuffle cleanup tracking (SPARK-53413).
        */
-      val newChildren = v2Command.children.map(ensureAQESupportsColumnar)
-      if (newChildren.forall(_.isEmpty)) {
-        v2Command
-      } else {
-        v2Command.withNewChildren(newChildren.flatten)
+      write.child match {
+        case aqe: AdaptiveSparkPlanExec if !aqe.supportsColumnar =>
+          write.withNewChildren(Seq(aqe.copy(supportsColumnar = true)))
+        case _ =>
+          write
       }
 
     case other => other
@@ -54,8 +54,7 @@ case class V2WritePostRule() extends Rule[SparkPlan] {
     plan match {
       case aqe: AdaptiveSparkPlanExec if !aqe.supportsColumnar =>
         Some(aqe.copy(supportsColumnar = true))
-      case _ =>
-        None
+      case _ => None
     }
   }
 }

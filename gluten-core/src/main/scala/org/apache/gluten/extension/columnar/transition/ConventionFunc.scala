@@ -22,7 +22,7 @@ import org.apache.gluten.extension.columnar.transition.ConventionReq.KnownChildC
 import org.apache.spark.sql.execution.{ColumnarToRowExec, SparkPlan, UnionExec}
 import org.apache.spark.sql.execution.adaptive.QueryStageExec
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
-import org.apache.spark.sql.execution.datasources.v2.V2CommandExec
+import org.apache.spark.sql.execution.datasources.v2.V2TableWriteExec
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 import org.apache.spark.util.SparkPlanUtil
 
@@ -175,11 +175,10 @@ object ConventionFunc {
             ConventionReq.RowType.Any,
             ConventionReq.BatchType.Is(Convention.BatchType.VanillaBatchType)))
       case write: DataWritingCommandExec if SparkPlanUtil.isPlannedV1Write(write) =>
-        // To align with ApplyColumnarRulesAndInsertTransitions#insertTransitions
         Seq(ConventionReq.any)
-      case _: V2CommandExec =>
-        // V2 commands (like WriteFilesExec) should allow any child convention
-        // to properly support columnar AQE for shuffle cleanup (SPARK-53413)
+      case _: V2TableWriteExec =>
+        // V2 table write execs (like AppendDataExec, OverwriteByExpressionExec) should allow any
+        // child convention to properly support columnar AQE for shuffle cleanup (SPARK-53413)
         Seq(ConventionReq.any)
       case u: UnionExec =>
         // We force vanilla union to output row data to get the best compatibility with vanilla
