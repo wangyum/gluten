@@ -81,76 +81,55 @@ object GlutenWriterColumnarRules {
       case aqe: AdaptiveSparkPlanExec =>
         val newChild = BackendsApiManager.getSparkPlanExecApiInstance
           .genColumnarToCarrierRow(aqe.inputPlan)
-        aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
-        command.withNewChildren(
-          Array(
-            AdaptiveSparkPlanExec(
-              newChild,
-              aqe.context,
-              aqe.preprocessingRules,
-              aqe.isSubquery,
-              supportsColumnar = false
-            )))
+        command.withNewChildren(Array(wrapAqeWithColumnarToRow(newChild, aqe)))
       case other =>
         command.withNewChildren(
           Array(BackendsApiManager.getSparkPlanExecApiInstance.genColumnarToCarrierRow(other)))
     }
   }
 
+  private def wrapAqeWithColumnarToRow(
+      newChild: SparkPlan,
+      aqe: AdaptiveSparkPlanExec): AdaptiveSparkPlanExec = {
+    aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
+    AdaptiveSparkPlanExec(
+      newChild,
+      aqe.context,
+      aqe.preprocessingRules,
+      aqe.isSubquery,
+      supportsColumnar = false)
+  }
+
   case class NativeWritePostRule(session: SparkSession) extends Rule[SparkPlan] {
 
     override def apply(p: SparkPlan): SparkPlan = p match {
       case rc @ DataWritingCommandExec(cmd, child) =>
-        // The same thread can set these properties in the last query submission.
         val format =
-          if (
-            BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
-            BackendsApiManager.getSettings.enableNativeWriteFiles()
-          ) {
+          if (BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
+              BackendsApiManager.getSettings.enableNativeWriteFiles()) {
             getNativeFormat(cmd)
-          } else {
-            None
-          }
-        val numStaticPartitions: Option[Int] = cmd match {
-          case cmd: InsertIntoHadoopFsRelationCommand =>
-            Some(cmd.staticPartitions.size)
-          case _ =>
-            None
+          } else None
+        val numStaticPartitions = cmd match {
+          case cmd: InsertIntoHadoopFsRelationCommand => Some(cmd.staticPartitions.size)
+          case _ => None
         }
         injectSparkLocalProperty(session, format, numStaticPartitions)
         format match {
-          case Some(_) =>
-            injectFakeRowAdaptor(rc, child)
+          case Some(_) => injectFakeRowAdaptor(rc, child)
           case None =>
-            val newChildren = rc.children.map {
+            rc.withNewChildren(rc.children.map {
               case aqe: AdaptiveSparkPlanExec =>
-                val newChild = ColumnarToRowExec(aqe.inputPlan)
-                aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
-                AdaptiveSparkPlanExec(
-                  newChild,
-                  aqe.context,
-                  aqe.preprocessingRules,
-                  aqe.isSubquery,
-                  supportsColumnar = false)
+                wrapAqeWithColumnarToRow(ColumnarToRowExec(aqe.inputPlan), aqe)
               case other => apply(other)
-            }
-            rc.withNewChildren(newChildren)
+            })
         }
 
       case command: ExecutedCommandExec =>
-        val newChildren = command.children.map {
+        command.withNewChildren(command.children.map {
           case aqe: AdaptiveSparkPlanExec =>
-            val newChild = ColumnarToRowExec(aqe.inputPlan)
-            aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
-            AdaptiveSparkPlanExec(
-              newChild,
-              aqe.context,
-              aqe.preprocessingRules,
-              aqe.isSubquery,
-              supportsColumnar = false)
+            wrapAqeWithColumnarToRow(ColumnarToRowExec(aqe.inputPlan), aqe)
           case other => apply(other)
-        }
-        command.withNewChildren(newChildren)
+        })
 
       case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
     }
