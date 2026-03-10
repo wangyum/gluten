@@ -24,7 +24,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec, ExecutedCommandExec}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveDirCommand, InsertIntoHiveTable}
 import org.apache.spark.sql.sources.DataSourceRegister
 
@@ -79,16 +79,18 @@ object GlutenWriterColumnarRules {
       // So FakeRowAdaptor will always consumes columnar data,
       // thus avoiding the case of c2r->aqe->r2c->writer
       case aqe: AdaptiveSparkPlanExec =>
+        val newChild = BackendsApiManager.getSparkPlanExecApiInstance
+          .genColumnarToCarrierRow(aqe.inputPlan)
+        aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
         command.withNewChildren(
           Array(
-            BackendsApiManager.getSparkPlanExecApiInstance.genColumnarToCarrierRow(
-              AdaptiveSparkPlanExec(
-                aqe.inputPlan,
-                aqe.context,
-                aqe.preprocessingRules,
-                aqe.isSubquery,
-                supportsColumnar = true
-              ))))
+            AdaptiveSparkPlanExec(
+              newChild,
+              aqe.context,
+              aqe.preprocessingRules,
+              aqe.isSubquery,
+              supportsColumnar = false
+            )))
       case other =>
         command.withNewChildren(
           Array(BackendsApiManager.getSparkPlanExecApiInstance.genColumnarToCarrierRow(other)))
@@ -120,8 +122,35 @@ object GlutenWriterColumnarRules {
           case Some(_) =>
             injectFakeRowAdaptor(rc, child)
           case None =>
-            rc.withNewChildren(rc.children.map(apply))
+            val newChildren = rc.children.map {
+              case aqe: AdaptiveSparkPlanExec =>
+                val newChild = ColumnarToRowExec(aqe.inputPlan)
+                aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
+                AdaptiveSparkPlanExec(
+                  newChild,
+                  aqe.context,
+                  aqe.preprocessingRules,
+                  aqe.isSubquery,
+                  supportsColumnar = false)
+              case other => apply(other)
+            }
+            rc.withNewChildren(newChildren)
         }
+
+      case command: ExecutedCommandExec =>
+        val newChildren = command.children.map {
+          case aqe: AdaptiveSparkPlanExec =>
+            val newChild = ColumnarToRowExec(aqe.inputPlan)
+            aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
+            AdaptiveSparkPlanExec(
+              newChild,
+              aqe.context,
+              aqe.preprocessingRules,
+              aqe.isSubquery,
+              supportsColumnar = false)
+          case other => apply(other)
+        }
+        command.withNewChildren(newChildren)
 
       case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
     }
