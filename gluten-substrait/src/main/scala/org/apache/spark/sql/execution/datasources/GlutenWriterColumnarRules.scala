@@ -24,7 +24,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec, ExecutedCommandExec}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveDirCommand, InsertIntoHiveTable}
 import org.apache.spark.sql.sources.DataSourceRegister
 
@@ -79,49 +79,57 @@ object GlutenWriterColumnarRules {
       // So FakeRowAdaptor will always consumes columnar data,
       // thus avoiding the case of c2r->aqe->r2c->writer
       case aqe: AdaptiveSparkPlanExec =>
-        command.withNewChildren(
-          Array(
-            BackendsApiManager.getSparkPlanExecApiInstance.genColumnarToCarrierRow(
-              AdaptiveSparkPlanExec(
-                aqe.inputPlan,
-                aqe.context,
-                aqe.preprocessingRules,
-                aqe.isSubquery,
-                supportsColumnar = true
-              ))))
+        val newChild = BackendsApiManager.getSparkPlanExecApiInstance
+          .genColumnarToCarrierRow(aqe.inputPlan)
+        command.withNewChildren(Array(wrapAqeWithColumnarToRow(newChild, aqe)))
       case other =>
         command.withNewChildren(
           Array(BackendsApiManager.getSparkPlanExecApiInstance.genColumnarToCarrierRow(other)))
     }
   }
 
+  private def wrapAqeWithColumnarToRow(
+      newChild: SparkPlan,
+      aqe: AdaptiveSparkPlanExec): AdaptiveSparkPlanExec = {
+    aqe.inputPlan.logicalLink.foreach(newChild.setLogicalLink)
+    AdaptiveSparkPlanExec(
+      newChild,
+      aqe.context,
+      aqe.preprocessingRules,
+      aqe.isSubquery,
+      supportsColumnar = false)
+  }
+
   case class NativeWritePostRule(session: SparkSession) extends Rule[SparkPlan] {
 
     override def apply(p: SparkPlan): SparkPlan = p match {
       case rc @ DataWritingCommandExec(cmd, child) =>
-        // The same thread can set these properties in the last query submission.
         val format =
-          if (
-            BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
-            BackendsApiManager.getSettings.enableNativeWriteFiles()
-          ) {
+          if (BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
+              BackendsApiManager.getSettings.enableNativeWriteFiles()) {
             getNativeFormat(cmd)
-          } else {
-            None
-          }
-        val numStaticPartitions: Option[Int] = cmd match {
-          case cmd: InsertIntoHadoopFsRelationCommand =>
-            Some(cmd.staticPartitions.size)
-          case _ =>
-            None
+          } else None
+        val numStaticPartitions = cmd match {
+          case cmd: InsertIntoHadoopFsRelationCommand => Some(cmd.staticPartitions.size)
+          case _ => None
         }
         injectSparkLocalProperty(session, format, numStaticPartitions)
         format match {
-          case Some(_) =>
-            injectFakeRowAdaptor(rc, child)
+          case Some(_) => injectFakeRowAdaptor(rc, child)
           case None =>
-            rc.withNewChildren(rc.children.map(apply))
+            rc.withNewChildren(rc.children.map {
+              case aqe: AdaptiveSparkPlanExec =>
+                wrapAqeWithColumnarToRow(ColumnarToRowExec(aqe.inputPlan), aqe)
+              case other => apply(other)
+            })
         }
+
+      case command: ExecutedCommandExec =>
+        command.withNewChildren(command.children.map {
+          case aqe: AdaptiveSparkPlanExec =>
+            wrapAqeWithColumnarToRow(ColumnarToRowExec(aqe.inputPlan), aqe)
+          case other => apply(other)
+        })
 
       case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
     }
