@@ -105,8 +105,10 @@ object GlutenWriterColumnarRules {
     override def apply(p: SparkPlan): SparkPlan = p match {
       case rc @ DataWritingCommandExec(cmd, child) =>
         val format =
-          if (BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
-              BackendsApiManager.getSettings.enableNativeWriteFiles()) {
+          if (
+            BackendsApiManager.getSettings.supportNativeWrite(child.schema.fields) &&
+            BackendsApiManager.getSettings.enableNativeWriteFiles()
+          ) {
             getNativeFormat(cmd)
           } else None
         val numStaticPartitions = cmd match {
