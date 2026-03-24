@@ -1,5 +1,5 @@
 == Physical Plan ==
-AdaptiveSparkPlan (109)
+AdaptiveSparkPlan (108)
 +- == Final Plan ==
    VeloxColumnarToRow (69)
    +- TakeOrderedAndProjectExecTransformer (68)
@@ -57,45 +57,44 @@ AdaptiveSparkPlan (109)
                               +- ShuffleQueryStage (57), Statistics(X)
                                  +- ReusedExchange (56)
 +- == Initial Plan ==
-   TakeOrderedAndProject (108)
-   +- HashAggregate (107)
-      +- HashAggregate (106)
-         +- Project (105)
-            +- SortMergeJoin Inner (104)
-               :- Sort (91)
-               :  +- Exchange (90)
-               :     +- Project (89)
-               :        +- SortMergeJoin Inner (88)
-               :           :- Sort (73)
-               :           :  +- Exchange (72)
-               :           :     +- Filter (71)
-               :           :        +- Scan parquet (70)
-               :           +- Sort (87)
-               :              +- Exchange (86)
-               :                 +- SortMergeJoin LeftSemi (85)
-               :                    :- Sort (77)
-               :                    :  +- Exchange (76)
-               :                    :     +- Filter (75)
-               :                    :        +- Scan parquet (74)
-               :                    +- Sort (84)
-               :                       +- Project (83)
-               :                          +- Filter (82)
-               :                             +- HashAggregate (81)
-               :                                +- Exchange (80)
-               :                                   +- HashAggregate (79)
-               :                                      +- Scan parquet (78)
-               +- SortMergeJoin LeftSemi (103)
-                  :- Sort (95)
-                  :  +- Exchange (94)
-                  :     +- Filter (93)
-                  :        +- Scan parquet (92)
-                  +- Sort (102)
-                     +- Project (101)
-                        +- Filter (100)
-                           +- HashAggregate (99)
-                              +- Exchange (98)
-                                 +- HashAggregate (97)
-                                    +- Scan parquet (96)
+   TakeOrderedAndProject (107)
+   +- HashAggregate (106)
+      +- Project (105)
+         +- SortMergeJoin Inner (104)
+            :- Sort (91)
+            :  +- Exchange (90)
+            :     +- Project (89)
+            :        +- SortMergeJoin Inner (88)
+            :           :- Sort (73)
+            :           :  +- Exchange (72)
+            :           :     +- Filter (71)
+            :           :        +- Scan parquet (70)
+            :           +- Sort (87)
+            :              +- Exchange (86)
+            :                 +- SortMergeJoin LeftSemi (85)
+            :                    :- Sort (77)
+            :                    :  +- Exchange (76)
+            :                    :     +- Filter (75)
+            :                    :        +- Scan parquet (74)
+            :                    +- Sort (84)
+            :                       +- Project (83)
+            :                          +- Filter (82)
+            :                             +- HashAggregate (81)
+            :                                +- Exchange (80)
+            :                                   +- HashAggregate (79)
+            :                                      +- Scan parquet (78)
+            +- SortMergeJoin LeftSemi (103)
+               :- Sort (95)
+               :  +- Exchange (94)
+               :     +- Filter (93)
+               :        +- Scan parquet (92)
+               +- Sort (102)
+                  +- Project (101)
+                     +- Filter (100)
+                        +- HashAggregate (99)
+                           +- Exchange (98)
+                              +- HashAggregate (97)
+                                 +- Scan parquet (96)
 
 
 (1) FileSourceScanExecTransformer parquet 
@@ -563,21 +562,14 @@ Input [7]: [c_custkey#X, c_name#X, o_orderkey#X, o_totalprice#X, o_orderdate#X, 
 (106) HashAggregate
 Input [6]: [c_custkey#X, c_name#X, o_orderkey#X, o_totalprice#X, o_orderdate#X, l_quantity#X]
 Keys [5]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X]
-Functions [1]: [partial_sum(l_quantity#X)]
-Aggregate Attributes [2]: [sum#X, isEmpty#X]
-Results [7]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum#X, isEmpty#X]
-
-(107) HashAggregate
-Input [7]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum#X, isEmpty#X]
-Keys [5]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X]
 Functions [1]: [sum(l_quantity#X)]
 Aggregate Attributes [1]: [sum(l_quantity#X)#X]
 Results [6]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum(l_quantity#X)#X AS sum(l_quantity)#X]
 
-(108) TakeOrderedAndProject
+(107) TakeOrderedAndProject
 Input [6]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum(l_quantity)#X]
 Arguments: X, [o_totalprice#X DESC NULLS LAST, o_orderdate#X ASC NULLS FIRST], [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum(l_quantity)#X]
 
-(109) AdaptiveSparkPlan
+(108) AdaptiveSparkPlan
 Output [6]: [c_name#X, c_custkey#X, o_orderkey#X, o_orderdate#X, o_totalprice#X, sum(l_quantity)#X]
 Arguments: isFinalPlan=true

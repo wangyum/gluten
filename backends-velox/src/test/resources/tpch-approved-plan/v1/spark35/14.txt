@@ -1,5 +1,5 @@
 == Physical Plan ==
-AdaptiveSparkPlan (38)
+AdaptiveSparkPlan (37)
 +- == Final Plan ==
    VeloxColumnarToRow (24)
    +- ^ ProjectExecTransformer (22)
@@ -21,19 +21,18 @@ AdaptiveSparkPlan (38)
                               +- ^ FilterExecTransformer (11)
                                  +- ^ FileSourceScanExecTransformer parquet  (10)
 +- == Initial Plan ==
-   HashAggregate (37)
-   +- HashAggregate (36)
-      +- Project (35)
-         +- SortMergeJoin Inner (34)
-            :- Sort (29)
-            :  +- Exchange (28)
-            :     +- Project (27)
-            :        +- Filter (26)
-            :           +- Scan parquet (25)
-            +- Sort (33)
-               +- Exchange (32)
-                  +- Filter (31)
-                     +- Scan parquet (30)
+   HashAggregate (36)
+   +- Project (35)
+      +- SortMergeJoin Inner (34)
+         :- Sort (29)
+         :  +- Exchange (28)
+         :     +- Project (27)
+         :        +- Filter (26)
+         :           +- Scan parquet (25)
+         +- Sort (33)
+            +- Exchange (32)
+               +- Filter (31)
+                  +- Scan parquet (30)
 
 
 (1) FileSourceScanExecTransformer parquet 
@@ -191,17 +190,10 @@ Input [5]: [l_partkey#X, l_extendedprice#X, l_discount#X, p_partkey#X, p_type#X]
 (36) HashAggregate
 Input [3]: [l_extendedprice#X, l_discount#X, p_type#X]
 Keys: []
-Functions [2]: [partial_sum(CASE WHEN StartsWith(p_type#X, PROMO) THEN (l_extendedprice#X * (1 - l_discount#X)) ELSE 0.0000 END), partial_sum((l_extendedprice#X * (1 - l_discount#X)))]
-Aggregate Attributes [4]: [sum#X, isEmpty#X, sum#X, isEmpty#X]
-Results [4]: [sum#X, isEmpty#X, sum#X, isEmpty#X]
-
-(37) HashAggregate
-Input [4]: [sum#X, isEmpty#X, sum#X, isEmpty#X]
-Keys: []
 Functions [2]: [sum(CASE WHEN StartsWith(p_type#X, PROMO) THEN (l_extendedprice#X * (1 - l_discount#X)) ELSE 0.0000 END), sum((l_extendedprice#X * (1 - l_discount#X)))]
 Aggregate Attributes [2]: [sum(CASE WHEN StartsWith(p_type#X, PROMO) THEN (l_extendedprice#X * (1 - l_discount#X)) ELSE 0.0000 END)#X, sum((l_extendedprice#X * (1 - l_discount#X)))#X]
 Results [1]: [((100.00 * sum(CASE WHEN StartsWith(p_type#X, PROMO) THEN (l_extendedprice#X * (1 - l_discount#X)) ELSE 0.0000 END)#X) / sum((l_extendedprice#X * (1 - l_discount#X)))#X) AS promo_revenue#X]
 
-(38) AdaptiveSparkPlan
+(37) AdaptiveSparkPlan
 Output [1]: [promo_revenue#X]
 Arguments: isFinalPlan=true
