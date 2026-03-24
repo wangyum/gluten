@@ -1,5 +1,5 @@
 == Physical Plan ==
-AdaptiveSparkPlan (37)
+AdaptiveSparkPlan (36)
 +- == Final Plan ==
    VeloxColumnarToRow (23)
    +- ^ RegularHashAggregateExecTransformer (21)
@@ -20,19 +20,18 @@ AdaptiveSparkPlan (37)
                            +- ^ FilterExecTransformer (11)
                               +- ^ FileSourceScanExecTransformer parquet  (10)
 +- == Initial Plan ==
-   HashAggregate (36)
-   +- HashAggregate (35)
-      +- Project (34)
-         +- SortMergeJoin Inner (33)
-            :- Sort (28)
-            :  +- Exchange (27)
-            :     +- Project (26)
-            :        +- Filter (25)
-            :           +- Scan parquet (24)
-            +- Sort (32)
-               +- Exchange (31)
-                  +- Filter (30)
-                     +- Scan parquet (29)
+   HashAggregate (35)
+   +- Project (34)
+      +- SortMergeJoin Inner (33)
+         :- Sort (28)
+         :  +- Exchange (27)
+         :     +- Project (26)
+         :        +- Filter (25)
+         :           +- Scan parquet (24)
+         +- Sort (32)
+            +- Exchange (31)
+               +- Filter (30)
+                  +- Scan parquet (29)
 
 
 (1) FileSourceScanExecTransformer parquet 
@@ -186,17 +185,10 @@ Input [8]: [l_partkey#X, l_quantity#X, l_extendedprice#X, l_discount#X, p_partke
 (35) HashAggregate
 Input [2]: [l_extendedprice#X, l_discount#X]
 Keys: []
-Functions [1]: [partial_sum((l_extendedprice#X * (1 - l_discount#X)))]
-Aggregate Attributes [2]: [sum#X, isEmpty#X]
-Results [2]: [sum#X, isEmpty#X]
-
-(36) HashAggregate
-Input [2]: [sum#X, isEmpty#X]
-Keys: []
 Functions [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))]
 Aggregate Attributes [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))#X]
 Results [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))#X AS revenue#X]
 
-(37) AdaptiveSparkPlan
+(36) AdaptiveSparkPlan
 Output [1]: [revenue#X]
 Arguments: isFinalPlan=true

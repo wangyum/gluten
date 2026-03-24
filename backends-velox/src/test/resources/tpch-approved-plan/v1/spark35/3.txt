@@ -1,5 +1,5 @@
 == Physical Plan ==
-AdaptiveSparkPlan (66)
+AdaptiveSparkPlan (65)
 +- == Final Plan ==
    VeloxColumnarToRow (42)
    +- TakeOrderedAndProjectExecTransformer (41)
@@ -35,29 +35,28 @@ AdaptiveSparkPlan (66)
                                  +- ^ FilterExecTransformer (28)
                                     +- ^ FileSourceScanExecTransformer parquet  (27)
 +- == Initial Plan ==
-   TakeOrderedAndProject (65)
-   +- HashAggregate (64)
-      +- HashAggregate (63)
-         +- Project (62)
-            +- SortMergeJoin Inner (61)
-               :- Sort (55)
-               :  +- Exchange (54)
-               :     +- Project (53)
-               :        +- SortMergeJoin Inner (52)
-               :           :- Sort (47)
-               :           :  +- Exchange (46)
-               :           :     +- Project (45)
-               :           :        +- Filter (44)
-               :           :           +- Scan parquet (43)
-               :           +- Sort (51)
-               :              +- Exchange (50)
-               :                 +- Filter (49)
-               :                    +- Scan parquet (48)
-               +- Sort (60)
-                  +- Exchange (59)
-                     +- Project (58)
-                        +- Filter (57)
-                           +- Scan parquet (56)
+   TakeOrderedAndProject (64)
+   +- HashAggregate (63)
+      +- Project (62)
+         +- SortMergeJoin Inner (61)
+            :- Sort (55)
+            :  +- Exchange (54)
+            :     +- Project (53)
+            :        +- SortMergeJoin Inner (52)
+            :           :- Sort (47)
+            :           :  +- Exchange (46)
+            :           :     +- Project (45)
+            :           :        +- Filter (44)
+            :           :           +- Scan parquet (43)
+            :           +- Sort (51)
+            :              +- Exchange (50)
+            :                 +- Filter (49)
+            :                    +- Scan parquet (48)
+            +- Sort (60)
+               +- Exchange (59)
+                  +- Project (58)
+                     +- Filter (57)
+                        +- Scan parquet (56)
 
 
 (1) FileSourceScanExecTransformer parquet 
@@ -327,21 +326,14 @@ Input [6]: [o_orderkey#X, o_orderdate#X, o_shippriority#X, l_orderkey#X, l_exten
 (63) HashAggregate
 Input [5]: [o_orderdate#X, o_shippriority#X, l_orderkey#X, l_extendedprice#X, l_discount#X]
 Keys [3]: [l_orderkey#X, o_orderdate#X, o_shippriority#X]
-Functions [1]: [partial_sum((l_extendedprice#X * (1 - l_discount#X)))]
-Aggregate Attributes [2]: [sum#X, isEmpty#X]
-Results [5]: [l_orderkey#X, o_orderdate#X, o_shippriority#X, sum#X, isEmpty#X]
-
-(64) HashAggregate
-Input [5]: [l_orderkey#X, o_orderdate#X, o_shippriority#X, sum#X, isEmpty#X]
-Keys [3]: [l_orderkey#X, o_orderdate#X, o_shippriority#X]
 Functions [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))]
 Aggregate Attributes [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))#X]
 Results [4]: [l_orderkey#X, sum((l_extendedprice#X * (1 - l_discount#X)))#X AS revenue#X, o_orderdate#X, o_shippriority#X]
 
-(65) TakeOrderedAndProject
+(64) TakeOrderedAndProject
 Input [4]: [l_orderkey#X, revenue#X, o_orderdate#X, o_shippriority#X]
 Arguments: X, [revenue#X DESC NULLS LAST, o_orderdate#X ASC NULLS FIRST], [l_orderkey#X, revenue#X, o_orderdate#X, o_shippriority#X]
 
-(66) AdaptiveSparkPlan
+(65) AdaptiveSparkPlan
 Output [4]: [l_orderkey#X, revenue#X, o_orderdate#X, o_shippriority#X]
 Arguments: isFinalPlan=true
