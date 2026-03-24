@@ -194,6 +194,7 @@ case class ColumnarInputAdapter(child: SparkPlan)
   override def output: Seq[Attribute] = child.output
   final override val supportsColumnar: Boolean = true
   final override val supportsRowBased: Boolean = false
+  final override val supportsVectorExecution: Boolean = true
   override def rowType(): Convention.RowType = Convention.RowType.None
   override def batchType(): Convention.BatchType =
     BackendsApiManager.getSettings.primaryBatchType
