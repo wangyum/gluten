@@ -1,0 +1,176 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Auto Rebase Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to rebase onto upstream/main
+        required: true
+        default: main-ebay
+  schedule:
+    - cron: '0 20 * * *'
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+  packages: write
+
+concurrency:
+  group: auto-rebase-${{ github.event.inputs.target_branch || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        branch:
+          - "${{ github.event.inputs.target_branch || 'main-ebay' }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.target_branch || 'main-ebay' }}
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config user.name "automation"
+          git config user.email "automation@users.noreply.github.com"
+
+      - name: Ensure upstream remote
+        run: |
+          git remote add upstream https://github.com/apache/incubator-gluten.git 2>/dev/null || \
+          git remote set-url upstream https://github.com/apache/incubator-gluten.git
+          git fetch upstream main --prune
+
+      - name: Set up PAT for pushing
+        run: |
+          git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/wangyum/incubator-gluten.git
+          git config credential.helper ''
+
+      - name: Rebase onto upstream/main
+        id: rebase
+        run: |
+          BRANCH="${{ matrix.branch }}"
+          git checkout "$BRANCH"
+          BEFORE_SHA=$(git rev-parse HEAD)
+          set -e
+          if git merge-base --is-ancestor upstream/main "$BRANCH"; then
+            echo "Branch already contains upstream/main."
+          fi
+          if ! git rebase upstream/main; then
+            echo "Rebase conflict detected. Attempting AI-powered conflict resolution..."
+            CONFLICT_FILES=$(git diff --name-only --diff-filter=U)
+            if [ -z "$CONFLICT_FILES" ]; then
+              echo "No conflict files found."
+              git rebase --abort
+              exit 1
+            fi
+            echo "conflict_files=$CONFLICT_FILES" >> $GITHUB_OUTPUT
+            git rebase --abort
+          fi
+          AFTER_SHA=$(git rev-parse HEAD)
+          if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+            echo "No changes after rebase."
+            exit 0
+          fi
+          git push --force origin "$BRANCH"
+          echo "Rebased and pushed: $BEFORE_SHA -> $AFTER_SHA"
+
+      - name: AI Resolve Rebase Conflicts
+        if: steps.rebase.outputs.conflict_files != ''
+        run: |
+          BRANCH="${{ matrix.branch }}"
+          CONFLICT_FILES="${{ steps.rebase.outputs.conflict_files }}"
+          echo "Resolving conflicts in: $CONFLICT_FILES"
+          
+          for file in $CONFLICT_FILES; do
+            echo "=== Processing: $file ==="
+            
+            BASE=$(git show :1:"$file" 2>/dev/null || echo "")
+            CURRENT=$(git show :2:"$file" 2>/dev/null || echo "")
+            INCOMING=$(git show :3:"$file" 2>/dev/null || echo "")
+            
+            RESOLVED=$(python3 - "$BASE" "$CURRENT" "$INCOMING" << 'PYEOF'
+import sys
+import os
+try:
+    from openai import OpenAI
+    base = sys.argv[1]
+    current = sys.argv[2]
+    incoming = sys.argv[3]
+    
+    client = OpenAI(
+        base_url="https://api.deepseek.com",
+        api_key=os.environ.get("DEEPSEEK_API_KEY", "")
+    )
+    
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        max_tokens=4096,
+        messages=[{
+            "role": "user",
+            "content": f"""You are resolving git rebase conflicts. Given the base version, current version (ours), and incoming version (theirs), produce a resolved version that keeps the best of both changes while avoiding conflicts.
+
+BASE (original):
+```
+{base}
+```
+
+CURRENT/OURS (your branch changes):
+```
+{current}
+```
+
+INCOMING/THEIRS (upstream changes):
+```
+{incoming}
+```
+
+Output ONLY the resolved file content with no explanations. Keep Apache license headers if present."""
+        }]
+    )
+    print(response.choices[0].message.content)
+except ImportError:
+    print("ERROR: openai package not installed. Install with: pip install openai")
+    sys.exit(1)
+PYEOF
+)
+            
+            if [ $? -eq 0 ] && [ -n "$RESOLVED" ]; then
+              echo "$RESOLVED" > "$file"
+              git add "$file"
+              echo "Resolved: $file"
+            else
+              echo "Failed to resolve: $file"
+              exit 1
+            fi
+          done
+          
+          git rebase --continue || { echo "Rebase continue failed."; exit 1; }
+          
+          git push --force origin "$BRANCH"
+          echo "Conflicts resolved and pushed."
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Rebase job finished for branch ${{ matrix.branch }}"
