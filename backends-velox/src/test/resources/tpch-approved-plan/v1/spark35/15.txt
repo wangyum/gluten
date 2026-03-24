@@ -256,7 +256,7 @@ Arguments: isFinalPlan=true
 ===== Subqueries =====
 
 Subquery:1 Hosting operator id = 22 Hosting Expression = Subquery subquery#X, [id=#X]
-AdaptiveSparkPlan (72)
+AdaptiveSparkPlan (71)
 +- == Final Plan ==
    VeloxColumnarToRow (63)
    +- ^ RegularHashAggregateExecTransformer (61)
@@ -272,14 +272,13 @@ AdaptiveSparkPlan (72)
                                  +- ^ FilterExecTransformer (49)
                                     +- ^ FileSourceScanExecTransformer parquet  (48)
 +- == Initial Plan ==
-   HashAggregate (71)
-   +- HashAggregate (70)
-      +- HashAggregate (69)
-         +- Exchange (68)
-            +- HashAggregate (67)
-               +- Project (66)
-                  +- Filter (65)
-                     +- Scan parquet (64)
+   HashAggregate (70)
+   +- HashAggregate (69)
+      +- Exchange (68)
+         +- HashAggregate (67)
+            +- Project (66)
+               +- Filter (65)
+                  +- Scan parquet (64)
 
 
 (48) FileSourceScanExecTransformer parquet 
@@ -390,17 +389,10 @@ Results [1]: [sum((l_extendedprice#X * (1 - l_discount#X)))#X AS total_revenue#X
 (70) HashAggregate
 Input [1]: [total_revenue#X]
 Keys: []
-Functions [1]: [partial_max(total_revenue#X)]
-Aggregate Attributes [1]: [max#X]
-Results [1]: [max#X]
-
-(71) HashAggregate
-Input [1]: [max#X]
-Keys: []
 Functions [1]: [max(total_revenue#X)]
 Aggregate Attributes [1]: [max(total_revenue#X)#X]
 Results [1]: [max(total_revenue#X)#X AS max(total_revenue)#X]
 
-(72) AdaptiveSparkPlan
+(71) AdaptiveSparkPlan
 Output [1]: [max(total_revenue)#X]
 Arguments: isFinalPlan=true
