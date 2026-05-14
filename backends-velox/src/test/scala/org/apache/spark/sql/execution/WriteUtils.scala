@@ -27,6 +27,7 @@ import org.apache.spark.sql.util.QueryExecutionListener
 import java.io.File
 
 trait WriteUtils extends GlutenQueryTest with SQLTestUtils {
+  private val listenerBusWaitTimeoutMs = 15000
 
   def tableDir(table: String): File = {
     val identifier = spark.sessionState.sqlParser.parseTableIdentifier(table)
@@ -48,9 +49,10 @@ trait WriteUtils extends GlutenQueryTest with SQLTestUtils {
       }
     }
     try {
+      spark.sparkContext.listenerBus.waitUntilEmpty(listenerBusWaitTimeoutMs)
       spark.listenerManager.register(queryListener)
       spark.sql(sqlStr)
-      spark.sparkContext.listenerBus.waitUntilEmpty()
+      spark.sparkContext.listenerBus.waitUntilEmpty(listenerBusWaitTimeoutMs)
       if (expectNative) {
         assert(nativeUsed)
       } else {
