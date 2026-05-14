@@ -67,7 +67,6 @@ concurrency:
 jobs:
   build-native-lib-centos-7:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Get Ccache
@@ -115,7 +114,6 @@ jobs:
 
   build-internal-dependency:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Restore Maven cache
@@ -176,7 +174,6 @@ jobs:
         java: [ "java-17" ]
 
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     container: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -278,7 +275,6 @@ jobs:
   spark-test-spark35:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
@@ -341,7 +337,6 @@ jobs:
     if: ${{ contains(github.event.head_commit.message, '[scala-2.13]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
@@ -397,7 +392,6 @@ jobs:
   spark-test-spark35-slow:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
@@ -445,7 +439,6 @@ jobs:
   spark-test-spark35-ras:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     env:
       SPARK_TESTING: true
     container: apache/gluten:centos-8-jdk8
@@ -502,7 +495,6 @@ jobs:
   spark-test-spark35-slow-ras:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
@@ -549,7 +541,6 @@ jobs:
   spark-test-spark35-smj:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     env:
       SPARK_TESTING: true
     container: apache/gluten:centos-8-jdk8
@@ -606,7 +597,6 @@ jobs:
   spark-test-spark35-slow-smj:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
     env:
       SPARK_TESTING: true
     container: apache/gluten:centos-8-jdk8
@@ -661,7 +651,6 @@ jobs:
         spark: [ "spark-3.5" ]
         celeborn: [ "celeborn-0.6.1"]
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
@@ -743,7 +732,6 @@ jobs:
       matrix:
         scala_version: [ 2.12, 2.13 ]
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
     env:
       OAUTH_KEY: ${{ secrets.OAUTH_KEY }}
     container: centos:8
