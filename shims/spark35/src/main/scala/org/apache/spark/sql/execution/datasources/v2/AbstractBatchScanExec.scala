@@ -41,7 +41,7 @@ abstract class AbstractBatchScanExec(
     val replicatePartitions: Boolean = false
 ) extends DataSourceV2ScanExecBase {
 
-  @transient lazy val batch = if (scan == null) null else scan.toBatch
+  @transient lazy val batch: Batch = if (scan == null) null else scan.toBatch
 
   // TODO: unify the equal/hashCode implementation for all data source v2 query plans.
   override def equals(other: Any): Boolean = other match {
