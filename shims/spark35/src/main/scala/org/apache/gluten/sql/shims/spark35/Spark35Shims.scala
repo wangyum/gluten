@@ -336,7 +336,7 @@ class Spark35Shims extends SparkShims {
 
   override def getCommonPartitionValues(
       batchScan: BatchScanExec): Option[Seq[(InternalRow, Int)]] = {
-    batchScan.spjParams.commonPartitionValues
+    batchScan.commonPartitionValues
   }
 
   override def orderPartitions(
