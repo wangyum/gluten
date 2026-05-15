@@ -124,7 +124,7 @@ abstract class BatchScanExecShim(
                 "partition values that are not present in the original partitioning.")
           }
 
-          groupPartitions(newPartitions).get.map(_._2)
+          groupPartitions(newPartitions).getOrElse(Seq.empty).map(_._2)
 
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
