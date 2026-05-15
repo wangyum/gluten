@@ -154,7 +154,7 @@ abstract class AbstractBatchScanExec(
             conf.v2BucketingPartiallyClusteredDistributionEnabled
           ) {
             assert(
-              filteredPartitions.forall(_.size == 1),
+              filteredPartitions.forall(parts => parts.nonEmpty && parts.size == 1),
               "Expect partitions to be not grouped when " +
                 s"${SQLConf.V2_BUCKETING_PARTIALLY_CLUSTERED_DISTRIBUTION_ENABLED.key} " +
                 "is enabled"
