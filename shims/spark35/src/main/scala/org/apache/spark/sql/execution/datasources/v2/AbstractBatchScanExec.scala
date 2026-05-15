@@ -113,7 +113,7 @@ abstract class AbstractBatchScanExec(
                 "partition values that are not present in the original partitioning.")
           }
 
-          groupPartitions(newPartitions).getOrElse(Seq.empty).map(_._2)
+          groupPartitions(newPartitions).getOrElse(Seq.empty).map { case (_, parts) => parts }
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
           newPartitions.map(Seq(_))
