@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition}
+import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition, UnknownPartitioning}
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
@@ -108,7 +108,21 @@ abstract class AbstractBatchScanExec(
   }
 
   override def outputPartitioning: Partitioning = {
-    super.outputPartitioning match {
+    val basePartitioning = super.outputPartitioning match {
+      case p: UnknownPartitioning
+          if spjParams.keyGroupedPartitioning.isDefined &&
+            inputPartitions.nonEmpty && inputPartitions.forall(_.isInstanceOf[HasPartitionKey]) &&
+            KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get) =>
+        val expressions = spjParams.keyGroupedPartitioning.get
+        val keyRowOrdering = RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
+        val partitionKeys = inputPartitions
+          .map(_.asInstanceOf[HasPartitionKey].partitionKey())
+          .sorted(keyRowOrdering)
+        KeyedPartitioning(expressions, partitionKeys)
+      case p => p
+    }
+
+    basePartitioning match {
       case k: KeyedPartitioning if spjParams.commonPartitionValues.isDefined =>
         // We allow duplicated partition values if
         // `spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled` is true
