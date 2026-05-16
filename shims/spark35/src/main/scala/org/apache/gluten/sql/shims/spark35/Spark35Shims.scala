@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.plans.physical.{KeyGroupedPartitioning, Partitioning}
+import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.util.{InternalRowComparableWrapper, TimestampFormatter}
@@ -338,7 +338,7 @@ class Spark35Shims extends SparkShims {
 
   override def getCommonPartitionValues(
       batchScan: BatchScanExec): Option[Seq[(InternalRow, Int)]] = {
-    batchScan.spjParams.commonPartitionValues
+    None
   }
 
   override def orderPartitions(
@@ -356,7 +356,7 @@ class Spark35Shims extends SparkShims {
         var finalPartitions = filteredPartitions
 
         outputPartitioning match {
-          case p: KeyGroupedPartitioning =>
+          case p: KeyedPartitioning =>
             if (
               SQLConf.get.v2BucketingPushPartValuesEnabled &&
               SQLConf.get.v2BucketingPartiallyClusteredDistributionEnabled
@@ -428,12 +428,10 @@ class Spark35Shims extends SparkShims {
                 // could exist duplicated partition values, as partition grouping is not done
                 // at the beginning and postponed to this method. It is important to use unique
                 // partition values here so that grouped partitions won't get duplicated.
-                finalPartitions = p.uniquePartitionValues.map {
+                finalPartitions = p.partitionKeys.distinct.map {
                   partValue =>
                     // Use empty partition for those partition values that are not present
-                    partitionMapping.getOrElse(
-                      InternalRowComparableWrapper(partValue, p.expressions),
-                      Seq.empty)
+                    partitionMapping.getOrElse(partValue, Seq.empty)
                 }
               }
             } else {
@@ -442,12 +440,10 @@ class Spark35Shims extends SparkShims {
                   val row = parts.head.asInstanceOf[HasPartitionKey].partitionKey()
                   InternalRowComparableWrapper(row, p.expressions) -> parts
               }.toMap
-              finalPartitions = p.partitionValues.map {
+              finalPartitions = p.partitionKeys.map {
                 partValue =>
                   // Use empty partition for those partition values that are not present
-                  partitionMapping.getOrElse(
-                    InternalRowComparableWrapper(partValue, p.expressions),
-                    Seq.empty)
+                  partitionMapping.getOrElse(partValue, Seq.empty)
               }
             }
 
