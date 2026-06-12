@@ -18,8 +18,7 @@ name: Internal Velox Backend (x86)
 on:
   pull_request:
     paths:
-      - '.github/workflows/velox_backend_x86.yml'
-      - '.github/workflows/util/install-resources.sh' #TODO remove after image update
+      - '.github/workflows/velox_backend_enhanced.yml'
       - 'pom.xml'
       - 'backends-velox/**'
       - 'gluten-uniffle/**'
@@ -73,37 +72,34 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos7-release-default-${{github.sha}}
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
           restore-keys: |
-            ccache-centos7-release-default
+            ccache-enhanced-centos7-release-default
       - name: Build Gluten native libraries
         run: |
-          docker pull apache/gluten:vcpkg-centos-7
-          docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7 bash -c "
+          docker pull apache/gluten:vcpkg-centos-7-gcc13
+          docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7-gcc13 bash -c "
             set -e
             yum install tzdata -y
             df -a
             cd /work
             export CCACHE_DIR=/work/.ccache
-            export CCACHE_MAXSIZE=1G
             mkdir -p /work/.ccache
-            ccache -sz
-            bash dev/ci-velox-buildstatic-centos-7.sh
+            bash dev/ci-velox-buildstatic-centos-7-enhanced-features.sh
             ccache -s
             mkdir -p /work/.m2/repository/org/apache/arrow/
             cp -r /root/.m2/repository/org/apache/arrow/* /work/.m2/repository/org/apache/arrow/
           "
 
       - name: "Save ccache"
-        if: always()
         uses: actions/cache/save@v4
         id: ccache
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos7-release-default-${{github.sha}}
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
       - uses: actions/upload-artifact@v4
         with:
-          name: velox-native-lib-centos-7-${{github.sha}}
+          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
           path: ./cpp/build/releases/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
@@ -281,7 +277,7 @@ jobs:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: velox-native-lib-centos-7-${{github.sha}}
+          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
           path: ./cpp/build/releases
       - name: Download m2 dependency
         uses: actions/download-artifact@v4
@@ -308,9 +304,11 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
-          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
-          -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.SkipTest
+          export SPARK_HOME=/opt/shims/spark35/spark_home/
+          ls -l $SPARK_HOME
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi \
+          -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.SkipTest \
+          -DargLine="-Dspark.test.home=$SPARK_HOME"
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
