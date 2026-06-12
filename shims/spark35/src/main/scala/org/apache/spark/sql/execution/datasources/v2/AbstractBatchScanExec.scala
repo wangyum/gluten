@@ -111,14 +111,23 @@ abstract class AbstractBatchScanExec(
     val basePartitioning = super.outputPartitioning match {
       case p: UnknownPartitioning
           if spjParams.keyGroupedPartitioning.isDefined &&
-            inputPartitions.nonEmpty && inputPartitions.forall(_.isInstanceOf[HasPartitionKey]) &&
             KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get) =>
         val expressions = spjParams.keyGroupedPartitioning.get
-        val keyRowOrdering = RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
-        val partitionKeys = inputPartitions
-          .map(_.asInstanceOf[HasPartitionKey].partitionKey())
-          .sorted(keyRowOrdering)
-        KeyedPartitioning(expressions, partitionKeys)
+        val hasPartitionKeyPartitions =
+          inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
+        if (hasPartitionKeyPartitions.isEmpty) {
+          // No HasPartitionKey partitions (e.g. table is empty or all partitions filtered out).
+          // Return a KeyedPartitioning with empty keys so that operators like GroupPartitionsExec
+          // which require a Partitioning with Expression can still function correctly.
+          KeyedPartitioning(expressions, Seq.empty)
+        } else {
+          val keyRowOrdering =
+            RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
+          val partitionKeys = hasPartitionKeyPartitions
+            .map(_.asInstanceOf[HasPartitionKey].partitionKey())
+            .sorted(keyRowOrdering)
+          KeyedPartitioning(expressions, partitionKeys)
+        }
       case p => p
     }
 
