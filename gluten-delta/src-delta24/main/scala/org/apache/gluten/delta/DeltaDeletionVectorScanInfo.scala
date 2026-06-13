@@ -29,15 +29,15 @@ import org.apache.spark.sql.execution.datasources.{FileFormat, PartitionedFile}
 
 import org.apache.hadoop.fs.Path
 
-import java.net.URI
 import java.util.{Map => JMap}
 
 import scala.collection.JavaConverters._
 
 /**
  * Materializes per-file Delta DV read options for eBay Delta (3.0.0-ebay), which stores a broadcast
- * map keyed by relative file URIs (Map[URI, DeletionVectorDescriptorWithFilterType]) on the
- * DeltaParquetFileFormat rather than per-file otherConstantMetadataColumnValues keys.
+ * map keyed by absolute file URIs (Map[URI, DeletionVectorDescriptorWithFilterType]) on the
+ * DeltaParquetFileFormat. The key is created by absolutePath(tablePath, addFile.path).toUri in
+ * PreprocessTableWithDVs.createBroadcastDVMap.
  */
 object DeltaDeletionVectorScanInfo {
 
@@ -81,15 +81,15 @@ object DeltaDeletionVectorScanInfo {
 
     val scanInfos = partitionFiles.map {
       file =>
-        // The broadcastDvMap is keyed by relative URI (as stored in AddFile.path).
-        // Derive the relative URI by stripping the absolute table path prefix.
-        val absolutePathStr = file.filePath.toString
-        val relativeUri = toRelativeUri(absolutePathStr, tablePathStr)
+        // The broadcastDvMap is keyed by absolute URI, created by
+        // absolutePath(tahoeFileIndex.path.toString, addFile.path).toUri in
+        // PreprocessTableWithDVs.createBroadcastDVMap.
+        val absoluteUri = file.filePath.toUri
         val otherMetadata = SparkShimLoader.getSparkShims.getOtherConstantMetadataColumnValues(file)
         val normalizedMeta: Map[String, Object] =
           if (otherMetadata == null) Map.empty
           else otherMetadata.asScala.toMap
-        dvMap.get(relativeUri) match {
+        dvMap.get(absoluteUri) match {
           case Some(dvWithFilterType) =>
             val descriptor = dvWithFilterType.descriptor
             val filterType = dvWithFilterType.filterType
@@ -120,33 +120,6 @@ object DeltaDeletionVectorScanInfo {
       Some((scanInfos.map(_._1), scanInfos.map(_._2)))
     } else {
       None
-    }
-  }
-
-  /**
-   * Derives the relative URI of a file with respect to the table root. The broadcastDvMap in eBay
-   * Delta uses relative URIs (from AddFile.pathAsUri which is new URI(addFile.path)) as keys. For
-   * partitioned tables the relative URI includes the partition directory prefix.
-   */
-  private def toRelativeUri(absolutePathStr: String, tablePathStr: String): URI = {
-    // Normalize both paths to remove trailing slashes and ensure consistent format.
-    val tablePrefixWithSlash =
-      if (tablePathStr.endsWith("/")) tablePathStr else tablePathStr + "/"
-    if (absolutePathStr.startsWith(tablePrefixWithSlash)) {
-      new URI(absolutePathStr.substring(tablePrefixWithSlash.length))
-    } else {
-      // Fallback: try using just the URI path without scheme/authority.
-      val fileUri = new URI(absolutePathStr)
-      val tableUri = new URI(tablePathStr)
-      val filePath = fileUri.getPath
-      val tablePathPrefix = if (tableUri.getPath.endsWith("/")) tableUri.getPath
-      else tableUri.getPath + "/"
-      if (filePath.startsWith(tablePathPrefix)) {
-        new URI(filePath.substring(tablePathPrefix.length))
-      } else {
-        // Last resort: use the full URI (may not match in the map).
-        fileUri
-      }
     }
   }
 
