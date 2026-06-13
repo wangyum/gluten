@@ -108,28 +108,41 @@ abstract class AbstractBatchScanExec(
   }
 
   override def outputPartitioning: Partitioning = {
-    val basePartitioning = super.outputPartitioning match {
-      case p: UnknownPartitioning
-          if spjParams.keyGroupedPartitioning.isDefined &&
-            KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get) =>
-        val expressions = spjParams.keyGroupedPartitioning.get
-        val hasPartitionKeyPartitions =
-          inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
-        if (hasPartitionKeyPartitions.isEmpty) {
-          // No HasPartitionKey partitions (e.g. table is empty or all partitions filtered out).
-          // Return a KeyedPartitioning with empty keys so that operators like GroupPartitionsExec
-          // which require a Partitioning with Expression can still function correctly.
-          KeyedPartitioning(expressions, Seq.empty)
-        } else {
-          val keyRowOrdering =
-            RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
-          val partitionKeys = hasPartitionKeyPartitions
-            .map(_.asInstanceOf[HasPartitionKey].partitionKey())
-            .sorted(keyRowOrdering)
-          KeyedPartitioning(expressions, partitionKeys)
+    // When keyGroupedPartitioning is defined, we must ensure the result is a KeyedPartitioning
+    // (which extends both Partitioning and Expression). This is required because eBay Spark's
+    // EnsureRequirements may insert a GroupPartitionsExec above this node before Gluten's rules
+    // replace the original BatchScanExec with this transformer. GroupPartitionsExec calls
+    // child.outputPartitioning.asInstanceOf[Partitioning with Expression] at execution time,
+    // which requires KeyedPartitioning. If super.outputPartitioning returns UnknownPartitioning
+    // for any reason (e.g., v2BucketingEnabled=false in a different SQLConf context, or
+    // inputPartitions temporarily empty), we fall back to building KeyedPartitioning from
+    // inputPartitions directly.
+    val basePartitioning =
+      if (
+        spjParams.keyGroupedPartitioning.isDefined &&
+        KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get)
+      ) {
+        super.outputPartitioning match {
+          case k: KeyedPartitioning => k
+          case _ =>
+            // super did not produce KeyedPartitioning; build one from inputPartitions directly.
+            val expressions = spjParams.keyGroupedPartitioning.get
+            val hasPartitionKeyPartitions =
+              inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
+            if (hasPartitionKeyPartitions.isEmpty) {
+              KeyedPartitioning(expressions, Seq.empty)
+            } else {
+              val keyRowOrdering =
+                RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
+              val partitionKeys = hasPartitionKeyPartitions
+                .map(_.asInstanceOf[HasPartitionKey].partitionKey())
+                .sorted(keyRowOrdering)
+              KeyedPartitioning(expressions, partitionKeys)
+            }
         }
-      case p => p
-    }
+      } else {
+        super.outputPartitioning
+      }
 
     basePartitioning match {
       case k: KeyedPartitioning if spjParams.commonPartitionValues.isDefined =>
