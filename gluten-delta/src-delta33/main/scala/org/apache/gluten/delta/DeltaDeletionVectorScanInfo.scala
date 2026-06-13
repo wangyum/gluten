@@ -25,7 +25,7 @@ import org.apache.spark.sql.delta.DeltaParquetFileFormat
 import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor
 import org.apache.spark.sql.delta.deletionvectors.{RoaringBitmapArrayFormat, StoredBitmap}
 import org.apache.spark.sql.delta.storage.dv.HadoopFileSystemDVStore
-import org.apache.spark.sql.execution.datasources.PartitionedFile
+import org.apache.spark.sql.execution.datasources.{FileFormat, PartitionedFile}
 
 import org.apache.hadoop.fs.Path
 
@@ -62,8 +62,10 @@ object DeltaDeletionVectorScanInfo {
    * the DV bookkeeping keys stripped. Returns None when no file in the split carries a deletion
    * vector, so callers can keep the generic split representation.
    */
-  def normalize(partitionColumnCount: Int, partitionFiles: Seq[PartitionedFile])
-      : Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
+  def normalize(
+      partitionColumnCount: Int,
+      partitionFiles: Seq[PartitionedFile],
+      fileFormat: FileFormat = null): Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
     val scanInfos = extractAll(activeSparkSession, partitionColumnCount, partitionFiles)
     if (scanInfos.exists(_.deletionVectorInfo.hasDeletionVector)) {
       Some(

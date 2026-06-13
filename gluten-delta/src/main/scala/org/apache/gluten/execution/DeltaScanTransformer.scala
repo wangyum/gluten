@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.connector.read.streaming.SparkDataStream
 import org.apache.spark.sql.delta.{DeltaParquetFileFormat, NoMapping}
 import org.apache.spark.sql.execution.FileSourceScanExec
-import org.apache.spark.sql.execution.datasources.{FilePartition, HadoopFsRelation}
+import org.apache.spark.sql.execution.datasources.{FileFormat, FilePartition, HadoopFsRelation}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.BitSet
 
@@ -102,7 +102,7 @@ case class DeltaScanTransformer(
     splitInfos.zip(partitions).map {
       case (localFiles: LocalFilesNode, (filePartition: FilePartition, _)) =>
         DeltaDeletionVectorScanInfo
-          .normalize(partitionColumnCount, filePartition.files.toSeq)
+          .normalize(partitionColumnCount, filePartition.files.toSeq, relation.fileFormat)
           .map {
             case (otherMetadataColumns, deltaReadOptions) =>
               DeltaLocalFilesBuilder.makeDeltaLocalFiles(
