@@ -65,7 +65,8 @@ object DeltaDeletionVectorScanInfo {
   def normalize(
       partitionColumnCount: Int,
       partitionFiles: Seq[PartitionedFile],
-      fileFormat: FileFormat = null): Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
+      fileFormat: FileFormat =
+        null): Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
     val scanInfos = extractAll(activeSparkSession, partitionColumnCount, partitionFiles)
     if (scanInfos.exists(_.deletionVectorInfo.hasDeletionVector)) {
       Some(
