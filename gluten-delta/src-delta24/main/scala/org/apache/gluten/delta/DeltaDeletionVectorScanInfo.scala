@@ -35,16 +35,17 @@ import java.util.{Map => JMap}
 import scala.collection.JavaConverters._
 
 /**
- * Materializes per-file Delta DV read options for eBay Delta (3.0.0-ebay), which stores a
- * broadcast map keyed by relative file URIs (Map[URI, DeletionVectorDescriptorWithFilterType])
- * on the DeltaParquetFileFormat rather than per-file otherConstantMetadataColumnValues keys.
+ * Materializes per-file Delta DV read options for eBay Delta (3.0.0-ebay), which stores a broadcast
+ * map keyed by relative file URIs (Map[URI, DeletionVectorDescriptorWithFilterType]) on the
+ * DeltaParquetFileFormat rather than per-file otherConstantMetadataColumnValues keys.
  */
 object DeltaDeletionVectorScanInfo {
 
   def normalize(
       partitionColumnCount: Int,
       partitionFiles: Seq[PartitionedFile],
-      fileFormat: FileFormat = null): Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
+      fileFormat: FileFormat =
+        null): Option[(Seq[JMap[String, Object]], Seq[DeltaFileReadOptions])] = {
     fileFormat match {
       case delta: DeltaParquetFileFormat =>
         extractFromBroadcastDvMap(delta, partitionFiles)
@@ -139,7 +140,7 @@ object DeltaDeletionVectorScanInfo {
       val tableUri = new URI(tablePathStr)
       val filePath = fileUri.getPath
       val tablePathPrefix = if (tableUri.getPath.endsWith("/")) tableUri.getPath
-        else tableUri.getPath + "/"
+      else tableUri.getPath + "/"
       if (filePath.startsWith(tablePathPrefix)) {
         new URI(filePath.substring(tablePathPrefix.length))
       } else {
