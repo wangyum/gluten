@@ -74,10 +74,7 @@ object DeltaDeletionVectorScanInfo {
       return None
     }
     val spark = activeSparkSession
-    // Create a single Hadoop Configuration for the entire partition.
     val hadoopConf = spark.sessionState.newHadoopConf()
-    // Resolve table path once using the first file -- all files in a Delta table share the same
-    // root, so this avoids N-1 redundant filesystem existence checks.
     val cachedTablePath = resolveTablePath(hadoopConf, partitionColumnCount, partitionFiles.head)
 
     val scanInfos = partitionFiles.map {
@@ -93,7 +90,6 @@ object DeltaDeletionVectorScanInfo {
     }
   }
 
-  /** Public entry point for extracting DV info from a single file (used by tests). */
   def extract(
       spark: SparkSession,
       partitionColumnCount: Int,
@@ -212,10 +208,8 @@ object DeltaDeletionVectorScanInfo {
         "Unable to resolve Delta table path while materializing deletion vector payload")
     }
     if (descriptor.storageType != "i") {
-      // On-disk DV (storageType "u" for UUID or "p" for path): read raw bytes directly.
       readRawDvBytes(hadoopConf, tablePath, descriptor)
     } else {
-      // Inline DV (storageType "i"): bytes are in the descriptor metadata.
       val dvStore = new HadoopFileSystemDVStore(hadoopConf)
       StoredBitmap
         .create(descriptor, tablePath)
@@ -224,12 +218,6 @@ object DeltaDeletionVectorScanInfo {
     }
   }
 
-  /**
-   * Reads raw DV bytes directly from the DV file on disk. The file layout per entry is: [4 bytes
-   * BE] data_size, [N bytes] payload (Portable Roaring), [4 bytes BE] CRC32 checksum.
-   * `DeletionVectorStore.readRangeFromStream` handles all of this including checksum verification,
-   * and returns the raw payload bytes.
-   */
   private def readRawDvBytes(
       hadoopConf: Configuration,
       tablePath: Path,
