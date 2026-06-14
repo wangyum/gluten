@@ -61,6 +61,10 @@ object FallbackUtil extends Logging with AdaptiveSparkPlanHelper {
         true
       case _: ReusedExchangeExec =>
         true
+      // eBay Spark's GroupPartitionsExec only rearranges partitions and does not change data
+      // format, so it should not be counted as a fallback operator.
+      case p if p.getClass.getSimpleName == "GroupPartitionsExec" =>
+        true
       case _ =>
         false
     }
