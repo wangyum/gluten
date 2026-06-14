@@ -23,6 +23,7 @@ import org.apache.gluten.extension.columnar.offload.OffloadSingleNode
 import org.apache.gluten.extension.columnar.validator.Validators
 import org.apache.gluten.extension.injector.Injector
 
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
 
@@ -44,6 +45,47 @@ object OffloadIcebergScan {
           Validators.newValidator(new GlutenConfig(c.sqlConf), offload),
           offload
         )
+    }
+    // eBay Spark: propagate GroupPartitionsExec.expectedPartitionKeys to the child
+    // IcebergScanTransformer as commonPartitionValues, so that getSplitInfos returns the
+    // padded number of split infos (including empty ones for missing partition values).
+    injector.gluten.legacy.injectPostTransform {
+      _ =>
+        (plan: SparkPlan) =>
+          plan.transformDown {
+            case groupExec
+                if groupExec.getClass.getSimpleName == "GroupPartitionsExec" &&
+                  hasExpectedPartitionKeys(groupExec) =>
+              val commonValues = getExpectedPartitionValues(groupExec)
+              val newChild = groupExec.children.head.transform {
+                case scan: IcebergScanTransformer if scan.commonPartitionValues.isEmpty =>
+                  scan.copy(commonPartitionValues = Some(commonValues))
+              }
+              groupExec.withNewChildren(Seq(newChild))
+          }
+    }
+  }
+
+  private def hasExpectedPartitionKeys(plan: SparkPlan): Boolean = {
+    try {
+      val method = plan.getClass.getMethod("expectedPartitionKeys")
+      method.invoke(plan).asInstanceOf[Option[_]].isDefined
+    } catch {
+      case _: Exception => false
+    }
+  }
+
+  private def getExpectedPartitionValues(plan: SparkPlan): Seq[(InternalRow, Int)] = {
+    val method = plan.getClass.getMethod("expectedPartitionKeys")
+    val expectedKeys = method.invoke(plan).asInstanceOf[Option[Seq[_]]]
+    expectedKeys.get.map {
+      entry =>
+        val pair = entry.asInstanceOf[Product]
+        val wrapper = pair.productElement(0)
+        val numSplits = pair.productElement(1).asInstanceOf[Int]
+        val rowMethod = wrapper.getClass.getMethod("row")
+        val row = rowMethod.invoke(wrapper).asInstanceOf[InternalRow]
+        (row, numSplits)
     }
   }
 }
