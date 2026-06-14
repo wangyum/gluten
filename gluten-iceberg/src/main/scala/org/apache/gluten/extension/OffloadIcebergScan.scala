@@ -50,19 +50,18 @@ object OffloadIcebergScan {
     // IcebergScanTransformer as commonPartitionValues, so that getSplitInfos returns the
     // padded number of split infos (including empty ones for missing partition values).
     injector.gluten.legacy.injectPostTransform {
-      _ =>
-        (plan: SparkPlan) =>
-          plan.transformDown {
-            case groupExec
-                if groupExec.getClass.getSimpleName == "GroupPartitionsExec" &&
-                  hasExpectedPartitionKeys(groupExec) =>
-              val commonValues = getExpectedPartitionValues(groupExec)
-              val newChild = groupExec.children.head.transform {
-                case scan: IcebergScanTransformer if scan.commonPartitionValues.isEmpty =>
-                  scan.copy(commonPartitionValues = Some(commonValues))
-              }
-              groupExec.withNewChildren(Seq(newChild))
-          }
+      _ => (plan: SparkPlan) =>
+        plan.transformDown {
+          case groupExec
+              if groupExec.getClass.getSimpleName == "GroupPartitionsExec" &&
+                hasExpectedPartitionKeys(groupExec) =>
+            val commonValues = getExpectedPartitionValues(groupExec)
+            val newChild = groupExec.children.head.transform {
+              case scan: IcebergScanTransformer if scan.commonPartitionValues.isEmpty =>
+                scan.copy(commonPartitionValues = Some(commonValues))
+            }
+            groupExec.withNewChildren(Seq(newChild))
+        }
     }
   }
 
