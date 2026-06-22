@@ -35,11 +35,13 @@ import org.apache.spark.sql.delta.commands.VacuumCommand
 //
 //   Test 1 (bug scenario): corrupts the checkpoint Parquet to contain no AddFile rows,
 //     simulating what Velox would produce without the fix.  VACUUM then sees empty
-//     validFiles and deletes all data files.
+//     validFiles and deletes live files; Delta metadata still references deleted files,
+//     and the next read fails with FileNotFound.
 //
 //   Test 2 (fix verification): verifies that FallbackDeltaLogScan tags the checkpoint
-//     scan for JVM fallback (rule-level guard), then runs VACUUM end-to-end with Gluten
-//     enabled and asserts that all data files survive and all rows are readable.
+//     scan for JVM fallback and blocks OffloadOthers from native-converting the
+//     DeltaLogFileIndex scan, then runs VACUUM end-to-end with Gluten enabled and
+//     asserts that all data files survive and all rows are readable.
 //
 // Note: Delta table writes and reads use withSQLConf("spark.gluten.enabled" -> "false")
 // because Velox crashes on the Delta write path without -Pdelta (a_precision undefined in
@@ -53,12 +55,45 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
     super.sparkConf
       .set("spark.memory.offHeap.size", "2g")
       .set("spark.unsafe.exceptionOnMemoryLeak", "true")
+      .set("spark.gluten.forceEnabled", "true")
       .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
       .set(
         "spark.sql.catalog.spark_catalog",
         "org.apache.spark.sql.delta.catalog.DeltaCatalog")
       // UDF example libs are not present in CI artifacts; disable to avoid SparkContext crash.
       .set("velox.udf.lib.path", "")
+  }
+
+  private def containsFileNotFound(t: Throwable): Boolean = {
+    @scala.annotation.tailrec
+    def loop(current: Throwable): Boolean = {
+      if (current == null) {
+        false
+      } else {
+        val className = current.getClass.getName
+        val message = Option(current.getMessage).getOrElse("")
+        if (className.contains("FileNotFound") || message.contains("FileNotFound")) {
+          true
+        } else {
+          loop(current.getCause)
+        }
+      }
+    }
+
+    loop(t)
+  }
+
+  private def toQualifiedPath(
+      tablePath: String,
+      filePath: String,
+      hadoopConf: org.apache.hadoop.conf.Configuration): String = {
+    val p = new org.apache.hadoop.fs.Path(filePath)
+    val abs = if (p.isAbsolute) p else new org.apache.hadoop.fs.Path(tablePath, filePath)
+    abs.getFileSystem(hadoopConf).makeQualified(abs).toString
+  }
+
+  private def normalizePath(path: String): String = {
+    new org.apache.hadoop.fs.Path(path).toUri.getPath
   }
 
   // --------------------------------------------------------------------------
@@ -142,15 +177,49 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
           retentionHours = Some(0),
           safetyCheckEnabled = false)
 
-        val deletedCount = liveFilesBefore.count {
+        val deletedLiveFiles = liveFilesBefore.filter {
           file =>
             val fp = new org.apache.hadoop.fs.Path(file)
             !fp.getFileSystem(hadoopConf).exists(fp)
         }
         assert(
-          deletedCount > 0,
+          deletedLiveFiles.nonEmpty,
           "Expected VACUUM to delete at least one live file when validFiles is empty " +
             "(corrupted checkpoint), but no files were deleted."
+        )
+        val deletedLiveFilesNormalized = deletedLiveFiles.map(normalizePath)
+
+        // Deleted files must still be referenced by Delta metadata, matching the production
+        // symptom: metadata points to files that no longer exist on storage.
+        DeltaLog.invalidateCache(spark, new org.apache.hadoop.fs.Path(path))
+        val refreshedDeltaLog = DeltaLog.forTable(spark, path)
+        var trackedFilesAfterVacuum = Set.empty[String]
+        withSQLConf(("spark.gluten.enabled", "false")) {
+          trackedFilesAfterVacuum = refreshedDeltaLog
+            .update()
+            .allFiles
+            .collect()
+            .map(addFile => toQualifiedPath(path, addFile.path, hadoopConf))
+            .toSet
+        }
+        val trackedFilesAfterVacuumNormalized = trackedFilesAfterVacuum.map(normalizePath)
+        assert(
+          deletedLiveFilesNormalized.exists(trackedFilesAfterVacuumNormalized.contains),
+          "Expected Delta metadata to still reference at least one deleted live file, " +
+            "but none of the deleted files remained in snapshot metadata."
+        )
+
+        DeltaLog.invalidateCache(spark, new org.apache.hadoop.fs.Path(path))
+        val readError = intercept[Exception] {
+          withSQLConf(("spark.gluten.enabled", "false")) {
+            spark.read.format("delta").load(path).collect()
+          }
+        }
+        assert(
+          containsFileNotFound(readError),
+          "Expected FileNotFound-style read failure after VACUUM deleted live files, " +
+            s"but got ${readError.getClass.getName}: " +
+            s"${Option(readError.getMessage).getOrElse("")}"
         )
     }
   }
@@ -232,12 +301,30 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
           tableIdentifier = None
         )
 
+        // Root-cause guard: without a fallback tag, OffloadOthers offloads this
+        // DeltaLogFileIndex scan to a native FileSourceScanExecTransformer.
+        val offloadOthers = org.apache.gluten.extension.columnar.offload.OffloadOthers()
+        val offloadedWithoutFallback = offloadOthers.offload(checkpointScan)
+        assert(
+          offloadedWithoutFallback
+            .isInstanceOf[org.apache.gluten.execution.FileSourceScanExecTransformerBase],
+          "Expected OffloadOthers to convert DeltaLogFileIndex scan to native when no " +
+            "fallback tag exists. If this changes, re-check HADP-VACUUM assumptions."
+        )
+
         org.apache.gluten.extension.FallbackDeltaLogScan().apply(checkpointScan)
 
         assert(
           org.apache.gluten.extension.columnar.FallbackTags.nonEmpty(checkpointScan),
           "FallbackDeltaLogScan did NOT tag the _delta_log checkpoint scan for JVM fallback. " +
             "Check that FallbackDeltaLogScan is registered in VeloxRuleApi.injectPreTransform."
+        )
+
+        val offloadedWithFallback = offloadOthers.offload(checkpointScan)
+        assert(
+          offloadedWithFallback eq checkpointScan,
+          "OffloadOthers still transformed a checkpoint scan after FallbackDeltaLogScan " +
+            "added fallback tags. This re-opens HADP-VACUUM data-loss risk."
         )
 
         // ---- End-to-end: VACUUM with Gluten enabled must not delete any live file ----

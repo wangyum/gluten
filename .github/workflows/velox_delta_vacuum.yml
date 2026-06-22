@@ -24,6 +24,13 @@ name: Delta VACUUM Safety Test (Velox)
 #
 # Fix: FallbackDeltaLogScan (in backends-velox, always active) detects scans
 # backed by DeltaLogFileIndex and forces JVM fallback before OffloadOthers runs.
+#
+# Suite contract:
+# - case 1 reproduces the production symptom end-to-end (deleted live files still
+#   referenced by Delta metadata, then read hits FileNotFound)
+# - case 2 proves the rule-level root cause/fix path
+#   (OffloadOthers would offload DeltaLogFileIndex without fallback tags;
+#    with FallbackDeltaLogScan tags, the scan remains on JVM)
 
 on:
   push:
@@ -33,6 +40,7 @@ on:
       - 'backends-velox/src/main/scala/org/apache/gluten/extension/FallbackDeltaLogScan.scala'
       - 'backends-velox/src/main/scala/org/apache/gluten/backendsapi/velox/VeloxRuleApi.scala'
       - 'backends-velox/src/test/scala/org/apache/gluten/execution/VeloxDeltaVacuumSuite.scala'
+      - 'backends-velox/pom.xml'
       - '.github/workflows/velox_delta_vacuum.yml'
   workflow_dispatch:
 
@@ -210,8 +218,36 @@ jobs:
           echo "  VeloxDeltaVacuumSuite (no -Pdelta)"
           echo "========================================="
           grep -E "Tests run:|BUILD " delta-vacuum-test-output.log || echo "(no summary found)"
+          grep -E "HADP-VACUUM \[before fix\]|HADP-VACUUM \[after fix\]" delta-vacuum-test-output.log || echo "(no HADP-VACUUM case names in console output)"
           grep -B1 "<<< FAIL!" delta-vacuum-test-output.log || echo "(no failures)"
           grep -B1 "<<< ERROR!" delta-vacuum-test-output.log || echo "(no errors)"
+
+      - name: Verify both HADP-VACUUM test cases executed
+        if: always()
+        run: |
+          set -e
+          python3 - <<'PY'
+          import glob
+          import pathlib
+          import sys
+
+          reports = glob.glob("**/surefire-reports/TEST-*VeloxDeltaVacuumSuite*.xml", recursive=True)
+          if not reports:
+            print("No VeloxDeltaVacuumSuite surefire report found", file=sys.stderr)
+            sys.exit(1)
+
+          content = "\n".join(pathlib.Path(r).read_text(encoding="utf-8", errors="ignore") for r in reports)
+          required = [
+            'name="HADP-VACUUM [before fix]:',
+            'name="HADP-VACUUM [after fix]:',
+          ]
+          missing = [m for m in required if m not in content]
+          if missing:
+            print("Missing expected test cases in surefire report:", missing, file=sys.stderr)
+            sys.exit(1)
+
+          print("Verified both HADP-VACUUM test cases were executed.")
+          PY
 
       - name: Upload test report
         if: always()
