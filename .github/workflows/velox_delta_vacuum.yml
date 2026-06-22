@@ -62,10 +62,10 @@ jobs:
 
       - name: Build Gluten native libraries
         run: |
-          docker pull apache/gluten:vcpkg-centos-7-gcc13
           docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7-gcc13 bash -c "
             set -e
             yum install tzdata -y
+            df -a
             cd /work
             export CCACHE_DIR=/work/.ccache
             export CCACHE_MAXSIZE=1G
@@ -78,6 +78,7 @@ jobs:
       - name: Save Ccache
         if: always()
         uses: actions/cache/save@v4
+        id: ccache
         with:
           path: '${{ env.CCACHE_DIR }}'
           key: ccache-centos7-release-default-${{ github.sha }}
@@ -85,7 +86,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: velox-native-lib-delta-vacuum-${{ github.sha }}
-          path: ./cpp/build/releases/
+          path: ./cpp/build/
           if-no-files-found: error
 
   # ── 2. Build eBay-internal dependencies (Spark + Hadoop jars) ───────────────
@@ -163,7 +164,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: velox-native-lib-delta-vacuum-${{ github.sha }}
-          path: ./cpp/build/releases/
+          path: ./cpp/build/
 
       - name: Download m2 dependency
         uses: actions/download-artifact@v4
