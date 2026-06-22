@@ -52,6 +52,12 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <!-- Required for VeloxDeltaVacuumSuite even when -Pdelta is not active -->
+    <dependency>
+      <groupId>io.delta</groupId>
+      <artifactId>${delta.package.name}_${scala.binary.version}</artifactId>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
