@@ -19,7 +19,6 @@ package org.apache.gluten.extension
 import org.apache.gluten.extension.columnar.FallbackTags
 
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.delta.DeltaLogFileIndex
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 
 /**
@@ -34,14 +33,17 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
  * gluten-delta module (-Pdelta) is on the classpath.
  *
  * Detection: Delta always uses DeltaLogFileIndex as the FileIndex for all transaction log scans
- * (both checkpoint Parquet and JSON commit files). Matching on this type is precise and avoids
- * fragile string matching on path names.
+ * (both checkpoint Parquet and JSON commit files). The class name check avoids a compile-time
+ * dependency on delta-spark, so this rule compiles and runs regardless of whether -Pdelta is
+ * active.
  */
 case class FallbackDeltaLogScan() extends Rule[SparkPlan] {
+  private val deltaLogFileIndexClassName = "org.apache.spark.sql.delta.DeltaLogFileIndex"
+
   override def apply(plan: SparkPlan): SparkPlan = {
     plan.foreach {
       case scan: FileSourceScanExec
-          if scan.relation.location.isInstanceOf[DeltaLogFileIndex] =>
+          if scan.relation.location.getClass.getName == deltaLogFileIndexClassName =>
         FallbackTags.add(scan, "Delta _delta_log scan must run on JVM")
       case _ =>
     }
