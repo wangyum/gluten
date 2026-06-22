@@ -19,11 +19,12 @@ package org.apache.gluten.extension
 import org.apache.gluten.extension.columnar.FallbackTags
 
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.delta.DeltaLogFileIndex
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 
 /**
- * Forces any FileSourceScanExec whose root paths are inside a Delta transaction log directory
- * (_delta_log) to fall back to JVM execution.
+ * Forces any FileSourceScanExec that reads from the Delta transaction log (_delta_log) to fall back
+ * to JVM execution.
  *
  * Without this rule, when the Gluten package is built without -Pdelta, the generic OffloadOthers
  * rule converts _delta_log checkpoint scans (e.g. those issued by VACUUM) to native Velox scans.
@@ -31,24 +32,19 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
  * to compute an empty validFiles set and delete every live data file. This rule is registered
  * unconditionally in VeloxRuleApi so that the protection is present regardless of whether the
  * gluten-delta module (-Pdelta) is on the classpath.
+ *
+ * Detection: Delta always uses DeltaLogFileIndex as the FileIndex for all transaction log scans
+ * (both checkpoint Parquet and JSON commit files). Matching on this type is precise and avoids
+ * fragile string matching on path names.
  */
 case class FallbackDeltaLogScan() extends Rule[SparkPlan] {
   override def apply(plan: SparkPlan): SparkPlan = {
     plan.foreach {
-      case scan: FileSourceScanExec if isDeltaLogScan(scan) =>
+      case scan: FileSourceScanExec
+          if scan.relation.location.isInstanceOf[DeltaLogFileIndex] =>
         FallbackTags.add(scan, "Delta _delta_log scan must run on JVM")
       case _ =>
     }
     plan
-  }
-
-  private def isDeltaLogScan(scan: FileSourceScanExec): Boolean = {
-    scan.relation.location.rootPaths.exists {
-      path =>
-        val str = path.toString
-        str.contains("/_delta_log") ||
-        str.contains("\\_delta_log") ||
-        str.endsWith("_delta_log")
-    }
   }
 }
