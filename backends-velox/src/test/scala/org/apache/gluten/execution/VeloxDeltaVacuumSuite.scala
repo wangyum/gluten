@@ -41,10 +41,10 @@ import org.apache.spark.sql.delta.commands.VacuumCommand
 //     scan for JVM fallback (rule-level guard), then runs VACUUM end-to-end with Gluten
 //     enabled and asserts that all data files survive and all rows are readable.
 //
-// Note: Delta table writes and reads are done with Gluten disabled because Velox does not
-// handle the Delta write path without -Pdelta (a_precision variable undefined in Velox's
-// type calculation).  Only VacuumCommand.gc runs with Gluten enabled, which is the exact
-// operation the fix targets.
+// Note: Delta table writes and reads use withSQLConf("spark.gluten.enabled" -> "false")
+// because Velox crashes on the Delta write path without -Pdelta (a_precision undefined in
+// Velox's type_calculation).  Only VacuumCommand.gc runs with Gluten enabled, which is the
+// exact operation the fix targets.
 class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
   override protected val resourcePath: String = "/tpch-data-parquet"
   override protected val fileFormat: String = "parquet"
@@ -74,7 +74,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
 
         // Create table and write data with Gluten disabled: Velox does not handle the Delta
         // write path without -Pdelta (a_precision undefined in Velox type calculation).
-        withGlutenDisabled {
+        withSQLConf(("spark.gluten.enabled", "false")) {
           spark.sql(s"""
                        |CREATE TABLE delta.`$path` (id INT) USING delta
                        |TBLPROPERTIES ('delta.checkpointInterval' = '1')
@@ -103,7 +103,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         // AddFile entry).  This replicates the output Velox produces when it misreads
         // the SingleAction schema.
         val tempDir = new org.apache.hadoop.fs.Path(deltaLogPath, "_hadp_corrupt_tmp")
-        withGlutenDisabled {
+        withSQLConf(("spark.gluten.enabled", "false")) {
           spark.read
             .parquet(latestCheckpoint.getPath.toString)
             .filter("add IS NULL")
@@ -126,7 +126,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         val deltaLog = DeltaLog.forTable(spark, path)
 
         // Capture the live data files referenced by the current snapshot before VACUUM.
-        val liveFilesBefore = withGlutenDisabled {
+        val liveFilesBefore = withSQLConf("spark.gluten.enabled" -> "false") {
           spark.read.format("delta").load(path).inputFiles.toSet
         }
         assert(liveFilesBefore.nonEmpty, "Expected live data files before VACUUM")
@@ -165,7 +165,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         import testImplicits._
         val path = p.getCanonicalPath
 
-        withGlutenDisabled {
+        withSQLConf(("spark.gluten.enabled", "false")) {
           spark.sql(s"""
                        |CREATE TABLE delta.`$path` (id INT) USING delta
                        |TBLPROPERTIES ('delta.checkpointInterval' = '1')
@@ -240,7 +240,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         )
 
         // ---- End-to-end: VACUUM with Gluten enabled must not delete any live file ----
-        val filesBeforeVacuum = withGlutenDisabled {
+        val filesBeforeVacuum = withSQLConf("spark.gluten.enabled" -> "false") {
           spark.read.format("delta").load(path).inputFiles.toSet
         }
         assert(filesBeforeVacuum.nonEmpty, "Expected live data files before VACUUM")
@@ -263,7 +263,7 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
             )
         }
 
-        withGlutenDisabled {
+        withSQLConf(("spark.gluten.enabled", "false")) {
           checkAnswer(
             spark.read.format("delta").load(path),
             Seq(Row(1), Row(2), Row(3)))
