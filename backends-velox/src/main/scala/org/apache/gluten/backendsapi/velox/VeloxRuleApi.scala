@@ -88,6 +88,7 @@ object VeloxRuleApi {
           c.session,
           c.caller.isBloomFilterStatFunction()))
     injector.injectPreTransform(_ => EliminateRedundantGetTimestamp)
+    injector.injectPreTransform(_ => FallbackDeltaLogScan())
 
     // Legacy: The legacy transform rule.
     val offloads = Seq(OffloadOthers(), OffloadExchange(), OffloadJoin()).map(_.toStrcitRule())
