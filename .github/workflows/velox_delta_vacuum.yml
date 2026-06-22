@@ -46,7 +46,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── 1. Build Velox native library ──────────────────────────────────────────
+  # ── 1. Build Velox native library (with ccache) ─────────────────────────────
   build-native-lib:
     runs-on: ubuntu-22.04
     steps:
@@ -85,12 +85,72 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: velox-native-lib-delta-vacuum-${{ github.sha }}
-          path: ./cpp/build/
+          path: ./cpp/build/releases/
           if-no-files-found: error
 
-  # ── 2. Run VeloxDeltaVacuumSuite WITHOUT -Pdelta ───────────────────────────
+  # ── 2. Build eBay-internal dependencies (Spark + Hadoop jars) ───────────────
+  build-internal-dependency:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Maven cache
+        id: m2cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            m2-
+
+      - name: Checkout packages repo
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/checkout@v4
+        with:
+          repository: wangyum/packages
+          ref: master
+          token: ${{ secrets.EBAY_TOKEN }}
+
+      - name: Install packages
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        run: |
+          mkdir -p /home/runner/.m2/repository
+          rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
+          mv io /home/runner/.m2/repository/
+          mv org /home/runner/.m2/repository/
+          cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
+
+      - name: Checkout ebay-spark repo
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/checkout@v4
+        with:
+          repository: wangyum/ebay-spark
+          ref: gluten-build
+          token: ${{ secrets.EBAY_TOKEN }}
+
+      - name: Install ebay-spark
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        run: |
+          build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          ./dev/change-scala-version.sh 2.13
+          build/mvn clean install -Pscala-2.13 -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+
+      - name: Save Maven cache
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m2-dependency-${{ github.sha }}
+          path: /home/runner/.m2/repository
+          if-no-files-found: error
+
+  # ── 3. Run VeloxDeltaVacuumSuite WITHOUT -Pdelta ────────────────────────────
   delta-vacuum-test:
-    needs: build-native-lib
+    needs: [build-native-lib, build-internal-dependency]
     runs-on: ubuntu-22.04
     container: apache/gluten:centos-9-jdk17
     env:
@@ -103,7 +163,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: velox-native-lib-delta-vacuum-${{ github.sha }}
-          path: ./cpp/build/
+          path: ./cpp/build/releases/
+
+      - name: Download m2 dependency
+        uses: actions/download-artifact@v4
+        with:
+          name: m2-dependency-${{ github.sha }}
+          path: /root/.m2/repository
 
       - name: Prepare Spark Resources
         run: |
