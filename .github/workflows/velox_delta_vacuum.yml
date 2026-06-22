@@ -106,7 +106,9 @@ jobs:
           path: ./cpp/build/
 
       - name: Prepare Spark Resources
-        run: bash .github/workflows/util/install-spark-resources.sh 3.5
+        run: |
+          rm -rf /opt/shims/spark35
+          bash .github/workflows/util/install-spark-resources.sh 3.5
 
       # Intentionally NO -Pdelta: the bug only manifests when Delta's
       # OffloadDeltaScan rule is absent.  The fix (FallbackDeltaLogScan) must
