@@ -126,8 +126,9 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         val deltaLog = DeltaLog.forTable(spark, path)
 
         // Capture the live data files referenced by the current snapshot before VACUUM.
-        val liveFilesBefore = withSQLConf("spark.gluten.enabled" -> "false") {
-          spark.read.format("delta").load(path).inputFiles.toSet
+        var liveFilesBefore = Set.empty[String]
+        withSQLConf(("spark.gluten.enabled", "false")) {
+          liveFilesBefore = spark.read.format("delta").load(path).inputFiles.toSet
         }
         assert(liveFilesBefore.nonEmpty, "Expected live data files before VACUUM")
 
@@ -240,8 +241,9 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         )
 
         // ---- End-to-end: VACUUM with Gluten enabled must not delete any live file ----
-        val filesBeforeVacuum = withSQLConf("spark.gluten.enabled" -> "false") {
-          spark.read.format("delta").load(path).inputFiles.toSet
+        var filesBeforeVacuum = Set.empty[String]
+        withSQLConf(("spark.gluten.enabled", "false")) {
+          filesBeforeVacuum = spark.read.format("delta").load(path).inputFiles.toSet
         }
         assert(filesBeforeVacuum.nonEmpty, "Expected live data files before VACUUM")
 
