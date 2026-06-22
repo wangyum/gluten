@@ -1,0 +1,163 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Delta VACUUM Safety Test (Velox)
+
+# Verifies that VACUUM on a Delta table produces correct results when Gluten is
+# enabled and built WITHOUT -Pdelta.
+#
+# Root cause: without -Pdelta, OffloadOthers sends the _delta_log checkpoint
+# scan to Velox, which misreads SingleAction Parquet and returns no AddFile rows.
+# VacuumCommand then computes an empty validFiles set and deletes every live file.
+#
+# Fix: FallbackDeltaLogScan (in backends-velox, always active) detects scans
+# backed by DeltaLogFileIndex and forces JVM fallback before OffloadOthers runs.
+
+on:
+  push:
+    branches:
+      - main-ebay
+    paths:
+      - 'backends-velox/src/main/scala/org/apache/gluten/extension/FallbackDeltaLogScan.scala'
+      - 'backends-velox/src/main/scala/org/apache/gluten/backendsapi/velox/VeloxRuleApi.scala'
+      - 'backends-velox/src/test/scala/org/apache/gluten/execution/VeloxDeltaVacuumSuite.scala'
+      - '.github/workflows/velox_delta_vacuum.yml'
+  workflow_dispatch:
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  MVN_CMD: 'build/mvn -ntp'
+  CCACHE_DIR: "${{ github.workspace }}/.ccache"
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.sha }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Build Velox native library ──────────────────────────────────────────
+  build-native-lib:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-centos7-release-default-${{ github.sha }}
+          restore-keys: |
+            ccache-centos7-release-default
+
+      - name: Build Gluten native libraries
+        run: |
+          docker pull apache/gluten:vcpkg-centos-7-gcc13
+          docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7-gcc13 bash -c "
+            set -e
+            yum install tzdata -y
+            cd /work
+            export CCACHE_DIR=/work/.ccache
+            export CCACHE_MAXSIZE=1G
+            mkdir -p /work/.ccache
+            ccache -sz
+            bash dev/ci-velox-buildstatic-centos-7.sh
+            ccache -s
+          "
+
+      - name: Save Ccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-centos7-release-default-${{ github.sha }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velox-native-lib-delta-vacuum-${{ github.sha }}
+          path: ./cpp/build/
+          if-no-files-found: error
+
+  # ── 2. Run VeloxDeltaVacuumSuite WITHOUT -Pdelta ───────────────────────────
+  delta-vacuum-test:
+    needs: build-native-lib
+    runs-on: ubuntu-22.04
+    container: apache/gluten:centos-9-jdk17
+    env:
+      SPARK_TESTING: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Native Lib
+        uses: actions/download-artifact@v4
+        with:
+          name: velox-native-lib-delta-vacuum-${{ github.sha }}
+          path: ./cpp/build/
+
+      - name: Prepare Spark Resources
+        run: bash .github/workflows/util/install-spark-resources.sh 3.5
+
+      # Intentionally NO -Pdelta: the bug only manifests when Delta's
+      # OffloadDeltaScan rule is absent.  The fix (FallbackDeltaLogScan) must
+      # work without -Pdelta, and so must the tests.
+      - name: Maven Build (no -Pdelta)
+        run: |
+          set -e
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
+          $MVN_CMD clean install \
+            -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg \
+            -DskipTests \
+            -T 4
+
+      - name: Run VeloxDeltaVacuumSuite
+        run: |
+          set -o pipefail
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+          export PATH=$JAVA_HOME/bin:$PATH
+          $MVN_CMD test \
+            -pl backends-velox \
+            -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pspark-ut \
+            -Dtest=VeloxDeltaVacuumSuite \
+            -DfailIfNoTests=false \
+            -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+            2>&1 | tee delta-vacuum-test-output.log
+
+      - name: Parse test results
+        if: always()
+        run: |
+          echo "========================================="
+          echo "  VeloxDeltaVacuumSuite (no -Pdelta)"
+          echo "========================================="
+          grep -E "Tests run:|BUILD " delta-vacuum-test-output.log || echo "(no summary found)"
+          grep -B1 "<<< FAIL!" delta-vacuum-test-output.log || echo "(no failures)"
+          grep -B1 "<<< ERROR!" delta-vacuum-test-output.log || echo "(no errors)"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delta-vacuum-test-report-${{ github.sha }}
+          path: |
+            **/surefire-reports/TEST-*VeloxDeltaVacuumSuite*.xml
+            delta-vacuum-test-output.log
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delta-vacuum-test-logs-${{ github.sha }}
+          path: |
+            **/target/*.log
+            **/hs_err_*.log
