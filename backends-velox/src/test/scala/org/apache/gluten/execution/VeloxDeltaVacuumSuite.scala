@@ -119,10 +119,16 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
         DeltaLog.invalidateCache(spark, new org.apache.hadoop.fs.Path(path))
         val deltaLog = DeltaLog.forTable(spark, path)
 
+        // Capture the live data files referenced by the current snapshot before VACUUM.
+        // These are the files VACUUM must preserve; with a corrupted checkpoint it will
+        // wrongly consider them unreferenced and delete them.
+        val liveFilesBefore = spark.read.format("delta").load(path).inputFiles.toSet
+        assert(liveFilesBefore.nonEmpty, "Expected live data files before VACUUM")
+
         // Run VACUUM with Gluten enabled (the default).
         // FallbackDeltaLogScan sends the checkpoint scan to JVM, which correctly reads
         // the corrupted file and finds no AddFile rows -> validFiles is empty ->
-        // VACUUM deletes every data file.
+        // VACUUM treats all live files as unreferenced and deletes them.
         VacuumCommand.gc(
           spark,
           deltaLog,
@@ -130,11 +136,21 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
           retentionHours = Some(0),
           safetyCheckEnabled = false)
 
-        // Verify: VACUUM deleted all data files.
-        val dataFiles = fs
-          .listStatus(new org.apache.hadoop.fs.Path(path))
-          .filterNot(f => f.getPath.getName == "_delta_log")
-        assert(dataFiles.isEmpty, "Expected VACUUM to delete all data files with empty validFiles")
+        // Verify: every file that was live before VACUUM has been deleted.
+        // We check the files that the snapshot actually referenced, not "all files in the
+        // directory", because VACUUM's deletion is gated on modificationTime <
+        // deleteBeforeTimestamp; files created in the same millisecond as the VACUUM run
+        // might survive that filter even though validFiles is empty.
+        val deletedCount = liveFilesBefore.count {
+          file =>
+            val fp = new org.apache.hadoop.fs.Path(file)
+            !fp.getFileSystem(hadoopConf).exists(fp)
+        }
+        assert(
+          deletedCount > 0,
+          "Expected VACUUM to delete at least one live file when validFiles is empty " +
+            "(corrupted checkpoint), but no files were deleted."
+        )
     }
   }
 
