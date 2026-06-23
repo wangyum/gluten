@@ -124,14 +124,16 @@ class VeloxDeltaVacuumSuite extends VeloxWholeStageTransformerSuite {
       tablePath: String,
       deltaLog: DeltaLog,
       hadoopConf: org.apache.hadoop.conf.Configuration): Set[String] = {
+    var liveFiles = Set.empty[String]
     withSQLConf(("spark.gluten.enabled", "false")) {
-      deltaLog
+      liveFiles = deltaLog
         .update()
         .allFiles
         .collect()
         .map(addFile => toQualifiedPath(tablePath, addFile.path, hadoopConf))
         .toSet
     }
+    liveFiles
   }
 
   private def buildCheckpointScan(
