@@ -206,7 +206,8 @@ jobs:
           $MVN_CMD test \
             -pl backends-velox \
             -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pspark-ut \
-            -Dtest=VeloxDeltaVacuumSuite \
+            -DwildcardSuites='org.apache.gluten.execution.VeloxDeltaVacuumSuite' \
+            -Dtest=none \
             -DfailIfNoTests=false \
             -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
             2>&1 | tee delta-vacuum-test-output.log

@@ -18,6 +18,7 @@ package org.apache.gluten.extension
 
 import org.apache.gluten.extension.columnar.FallbackTags
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 
@@ -36,11 +37,30 @@ import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
  * (both checkpoint Parquet and JSON commit files). The class name check avoids a compile-time
  * dependency on delta-spark, so this rule compiles and runs regardless of whether -Pdelta is
  * active.
+ *
+ * Test-only control: set spark.gluten.test.fallbackDeltaLogScan.enabled=false to disable this rule
+ * for negative-path regression tests.
  */
+object FallbackDeltaLogScan {
+  val TEST_FALLBACK_DELTA_LOG_SCAN_ENABLED: String =
+    "spark.gluten.test.fallbackDeltaLogScan.enabled"
+}
+
 case class FallbackDeltaLogScan() extends Rule[SparkPlan] {
   private val deltaLogFileIndexClassName = "org.apache.spark.sql.delta.DeltaLogFileIndex"
 
   override def apply(plan: SparkPlan): SparkPlan = {
+    val ruleEnabled = SparkSession
+      .getActiveSession
+      .orElse(SparkSession.getDefaultSession)
+      .forall(
+        _.sessionState.conf
+          .getConfString(FallbackDeltaLogScan.TEST_FALLBACK_DELTA_LOG_SCAN_ENABLED, "true")
+          .toBoolean)
+    if (!ruleEnabled) {
+      return plan
+    }
+
     plan.foreach {
       case scan: FileSourceScanExec
           if scan.relation.location.getClass.getName == deltaLogFileIndexClassName =>
