@@ -54,21 +54,20 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos7-release-default-${{github.sha}}
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
           restore-keys: |
-            ccache-centos7-release-default
+            ccache-enhanced-centos7-release-default
       - name: Build Gluten native libraries
         run: |
+          docker pull apache/gluten:vcpkg-centos-7-gcc13
           docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7-gcc13 bash -c "
             set -e
             yum install tzdata -y
             df -a
             cd /work
             export CCACHE_DIR=/work/.ccache
-            export CCACHE_MAXSIZE=1G
             mkdir -p /work/.ccache
-            ccache -sz
-            bash dev/ci-velox-buildstatic-centos-7.sh
+            bash dev/ci-velox-buildstatic-centos-7-enhanced-features.sh
             ccache -s
           "
       - name: Save ccache
@@ -77,15 +76,67 @@ jobs:
         id: ccache
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos7-release-default-${{github.sha}}
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
       - uses: actions/upload-artifact@v4
         with:
-          name: velox-native-lib-centos-7-${{github.sha}}
-          path: ./cpp/build/
+          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
+          path: ./cpp/build/releases/
+          if-no-files-found: error
+
+  build-internal-dependency:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Maven cache
+        id: m2cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            m2-
+      - name: Checkout packages repo
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/checkout@v4
+        with:
+          repository: wangyum/packages
+          ref: master
+          token: ${{ secrets.EBAY_TOKEN }}
+      - name: Install packages
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        run: |
+          mkdir -p /home/runner/.m2/repository
+          rm -rf /home/runner/.m2/repository/io && rm -rf /home/runner/.m2/repository/org
+          mv io /home/runner/.m2/repository/
+          mv org /home/runner/.m2/repository/
+          cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
+      - name: Checkout ebay-spark repo
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/checkout@v4
+        with:
+          repository: wangyum/ebay-spark
+          ref: gluten-build
+          token: ${{ secrets.EBAY_TOKEN }}
+      - name: Install ebay-spark
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        run: |
+          build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          ./dev/change-scala-version.sh 2.13
+          build/mvn clean install -Pscala-2.13 -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+      - name: Save Maven cache
+        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/.m2/repository
+          key: m2-${{ hashFiles('**/pom.xml') }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m2-dependency-${{ github.sha }}
+          path: /home/runner/.m2/repository
           if-no-files-found: error
 
   velox-delta-suite-spark35:
-    needs: build-native-lib-centos-7
+    needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
     env:
       SPARK_TESTING: true
@@ -95,8 +146,13 @@ jobs:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: velox-native-lib-centos-7-${{github.sha}}
-          path: ./cpp/build/
+          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
+          path: ./cpp/build/releases
+      - name: Download m2 dependency
+        uses: actions/download-artifact@v4
+        with:
+          name: m2-dependency-${{github.sha}}
+          path: /root/.m2/repository
       - name: Build and Run VeloxDeltaSuite for Spark 3.5
         run: |
           cd $GITHUB_WORKSPACE/
@@ -105,9 +161,11 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
+          export SPARK_HOME=/opt/shims/spark35/spark_home/
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi \
+          -pl backends-velox -am \
           -Dsuites=org.apache.gluten.execution.VeloxDeltaSuite \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/"
+          -DargLine="-Dspark.test.home=$SPARK_HOME"
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
