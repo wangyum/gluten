@@ -162,8 +162,12 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           export SPARK_HOME=/opt/shims/spark35/spark_home/
-          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi \
-          -pl backends-velox -am \
+          # Step 1: build and install all modules (skip tests so -Dsuites doesn't leak)
+          $MVN_CMD clean install -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi \
+          -DskipTests
+          # Step 2: run VeloxDeltaSuite only in backends-velox (no -am, class is already compiled)
+          $MVN_CMD test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi \
+          -pl backends-velox \
           -Dsuites=org.apache.gluten.execution.VeloxDeltaSuite \
           -DargLine="-Dspark.test.home=$SPARK_HOME"
       - name: Upload test report
