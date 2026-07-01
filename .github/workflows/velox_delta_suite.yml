@@ -16,6 +16,7 @@
 name: Velox Delta Suite
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '.github/workflows/velox_delta_suite.yml'
