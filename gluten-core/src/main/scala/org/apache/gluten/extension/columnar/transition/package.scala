@@ -40,12 +40,6 @@ package object transition {
     case p: AQEShuffleReadExec => true
     case p: InputAdapter => true
     case p: WholeStageCodegenExec => true
-    // eBay Spark's GroupPartitionsExec only rearranges partitions (via CoalescedRDD) and does
-    // not change data format. It calls child.executeColumnar() directly in doExecuteColumnar(),
-    // so no format conversion is needed. Propagating convention avoids inserting
-    // RowToColumnarExec/VeloxColumnarToRowExec between GroupPartitionsExec and the Velox
-    // transformer, which preserves the KeyedPartitioning reported by the transformer.
-    case p if p.getClass.getSimpleName == "GroupPartitionsExec" => true
     case _ => false
   }
 
