@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.connector.catalog.Table
-import org.apache.spark.sql.connector.read.Scan
+import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExecShim, FileScan}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.types.StructType
@@ -162,7 +162,7 @@ abstract class BatchScanExecTransformerBase(
 
   @transient protected lazy val finalPartitions: Seq[Partition] =
     filteredPartitions.zipWithIndex.map {
-      case (inputPartition, index) =>
+      case (inputPartition: Option[InputPartition], index) =>
         new SparkDataSourceRDDPartition(index, inputPartition.toSeq)
     }
 

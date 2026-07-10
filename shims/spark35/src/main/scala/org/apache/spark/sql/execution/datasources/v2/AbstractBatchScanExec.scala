@@ -20,7 +20,7 @@ import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition}
+import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, SinglePartition}
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
@@ -53,8 +53,7 @@ abstract class AbstractBatchScanExec(
 
   @transient override lazy val inputPartitions: Seq[InputPartition] = batch.planInputPartitions()
 
-  // Visible for testing
-  @transient private[sql] lazy val filteredPartitions: Seq[Option[InputPartition]] = {
+  @transient lazy val filteredPartitions: Seq[Option[InputPartition]] = {
     val dataSourceFilters = runtimeFilters.flatMap {
       case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
       case f => DataSourceV2Strategy.translateScalarSubqueryFilterV2(f)
@@ -73,36 +72,37 @@ abstract class AbstractBatchScanExec(
         case k: KeyedPartitioning =>
           if (newPartitions.exists(!_.isInstanceOf[HasPartitionKey])) {
             throw new SparkException("Data source must have preserved the original partitioning " +
-                "during runtime filtering: not all partitions implement HasPartitionKey after " +
-                "filtering")
+              "during runtime filtering: not all partitions implement HasPartitionKey after " +
+              "filtering")
           }
 
           val inputMap = k.partitionKeys.groupBy(identity).mapValues(_.size)
           val comparableKeyWrapperFactory = InternalRowComparableWrapper
             .getInternalRowComparableWrapperFactory(k.expressionDataTypes)
           val filteredMap = newPartitions.groupBy(
-            p => comparableKeyWrapperFactory(p.asInstanceOf[HasPartitionKey].partitionKey())
-          )
+            p => comparableKeyWrapperFactory(p.asInstanceOf[HasPartitionKey].partitionKey()))
 
           if (!filteredMap.keySet.subsetOf(inputMap.keySet)) {
             throw new SparkException("During runtime filtering, data source must not report new " +
-                "partition keys that are not present in the original partitioning.")
+              "partition keys that are not present in the original partitioning.")
           }
 
           inputMap.toSeq
             .sortBy(_._1)(k.keyOrdering)
-            .flatMap { case (key, size) =>
-              // We require the new number of partitions to be equal or less than the old number of
-              // partitions for a given key. In the case of less than, empty partitions are added.
-              val fps = filteredMap.getOrElse(key, Array.empty)
+            .flatMap {
+              case (key, size) =>
+                // We require the new number of partitions to be equal or less than the old number
+                // of partitions for a given key. In the case of less than, empty partitions added.
+                val fps = filteredMap.getOrElse(key, Array.empty)
 
-              if (fps.size > size) {
-                throw new SparkException("During runtime filtering, data source must not report " +
-                  s"new partitions for a given key. Before: $size partitions. " +
-                  s"After: ${fps.size} partitions")
-              }
+                if (fps.size > size) {
+                  throw new SparkException(
+                    "During runtime filtering, data source must not report " +
+                      s"new partitions for a given key. Before: $size partitions. " +
+                      s"After: ${fps.size} partitions")
+                }
 
-              fps.map(p => Some(p)).padTo(size, None)
+                fps.map(p => Some(p)).padTo(size, None)
             }
 
         case _ =>
@@ -128,7 +128,11 @@ abstract class AbstractBatchScanExec(
       sparkContext.parallelize(Array.empty[InternalRow], 1)
     } else {
       new DataSourceRDD(
-        sparkContext, filteredPartitions, readerFactory, supportsColumnar, customMetrics)
+        sparkContext,
+        filteredPartitions,
+        readerFactory,
+        supportsColumnar,
+        customMetrics)
     }
     postDriverMetrics()
     rdd
