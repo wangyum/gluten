@@ -24,7 +24,7 @@ import org.apache.gluten.execution.ValidationResult
 import org.apache.gluten.execution.WriteFilesExecTransformer
 import org.apache.gluten.expression.WindowFunctionsBuilder
 import org.apache.gluten.extension.columnar.cost.{LegacyCoster, LongCoster, RoughCoster}
-import org.apache.gluten.extension.columnar.transition.{Convention, ConventionFunc}
+import org.apache.gluten.extension.columnar.transition.{Convention, ConventionFunc, ConventionReq}
 import org.apache.gluten.sql.shims.SparkShimLoader
 import org.apache.gluten.substrait.rel.LocalFilesNode
 import org.apache.gluten.substrait.rel.LocalFilesNode.ReadFileFormat
@@ -79,6 +79,20 @@ object VeloxBackend {
   val CONF_PREFIX: String = GlutenConfig.prefixOf(BACKEND_NAME)
 
   private class ConvFunc() extends ConventionFunc.Override {
+    // GroupPartitionsExec (eBay Spark backport for SPARK-55535) is a dual-mode node whose
+    // supportsColumnar calls hasCoalescing -> groupedPartitionsTuple, which unsafely casts
+    // child.outputPartitioning to (Partitioning with Expression). This crashes when the child
+    // (e.g. IcebergScanTransformer) hasn't been transformed yet or reports UnknownPartitioning.
+    // We bypass supportsColumnar entirely and derive the convention from the child directly.
+    private val groupPartitionsExecClassName =
+      "org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec"
+
+    override def rowTypeOf: PartialFunction[SparkPlan, Convention.RowType] = {
+      case p if p.getClass.getName == groupPartitionsExecClassName =>
+        // GroupPartitionsExec always supports row-based execution via doExecute().
+        Convention.RowType.VanillaRowType
+    }
+
     override def batchTypeOf: PartialFunction[SparkPlan, Convention.BatchType] = {
       case a: AdaptiveSparkPlanExec if a.supportsColumnar =>
         VeloxBatchType
@@ -86,6 +100,30 @@ object VeloxBackend {
           if i.supportsColumnar && i.relation.cacheBuilder.serializer
             .isInstanceOf[ColumnarCachedBatchSerializer] =>
         VeloxBatchType
+      case p if p.getClass.getName == groupPartitionsExecClassName =>
+        // Derive batch type from child without calling GroupPartitionsExec.supportsColumnar.
+        // GroupPartitionsExec delegates columnar execution to its child (via doExecuteColumnar),
+        // so it supports columnar iff its child does. In Velox backend, any columnar child
+        // produces VeloxBatchType.
+        if (p.children.nonEmpty && p.children.head.supportsColumnar) {
+          VeloxBatchType
+        } else {
+          Convention.BatchType.None
+        }
+    }
+
+    override def conventionReqOf: PartialFunction[SparkPlan, Seq[ConventionReq]] = {
+      case p if p.getClass.getName == groupPartitionsExecClassName =>
+        // GroupPartitionsExec is dual-mode: it can accept columnar children and produce
+        // columnar output (when child.supportsColumnar), or accept row children and produce
+        // row output. Require the child's existing convention to avoid inserting unnecessary
+        // transitions. This avoids calling supportsColumnar on GroupPartitionsExec itself.
+        val childReq = if (p.children.nonEmpty && p.children.head.supportsColumnar) {
+          ConventionReq.ofBatch(ConventionReq.BatchType.Is(VeloxBatchType))
+        } else {
+          ConventionReq.ofRow(ConventionReq.RowType.Is(Convention.RowType.VanillaRowType))
+        }
+        Seq.tabulate(p.children.size)(_ => childReq)
     }
   }
 }
