@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitio
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
+import org.apache.spark.sql.internal.SQLConf
 
 import com.google.common.base.Objects
 
@@ -110,8 +111,7 @@ abstract class AbstractBatchScanExec(
   override def outputPartitioning: Partitioning = {
     val basePartitioning = super.outputPartitioning match {
       case p: UnknownPartitioning
-          if spjParams.keyGroupedPartitioning.isDefined &&
-            KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get) =>
+          if spjParams.keyGroupedPartitioning.isDefined =>
         val expressions = spjParams.keyGroupedPartitioning.get
         val hasPartitionKeyPartitions =
           inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
@@ -166,6 +166,15 @@ abstract class AbstractBatchScanExec(
 
   override def keyGroupedPartitioning: Option[Seq[Expression]] =
     spjParams.keyGroupedPartitioning
+
+  override def outputOrdering: Seq[SortOrder] = {
+    (ordering, outputPartitioning) match {
+      case (Some(o), _) => o
+      case (_, k: KeyedPartitioning) if SQLConf.get.v2BucketingPartitionKeyOrderingEnabled =>
+        k.expressions.map(SortOrder(_, Ascending))
+      case _ => Seq.empty
+    }
+  }
 
   override def simpleString(maxFields: Int): String = {
     val truncatedOutputString = truncatedString(output, "[", ", ", "]", maxFields)

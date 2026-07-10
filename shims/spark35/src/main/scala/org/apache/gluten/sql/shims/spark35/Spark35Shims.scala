@@ -427,7 +427,9 @@ class Spark35Shims extends SparkShims {
                 // could exist duplicated partition values, as partition grouping is not done
                 // at the beginning and postponed to this method. It is important to use unique
                 // partition values here so that grouped partitions won't get duplicated.
-                finalPartitions = p.partitionKeys.distinct.map {
+                // When isGrouped is true, partitionKeys are already distinct.
+                val uniqueKeys = if (p.isGrouped) p.partitionKeys else p.partitionKeys.distinct
+                finalPartitions = uniqueKeys.map {
                   partValue =>
                     // Use empty partition for those partition values that are not present
                     partitionMapping.getOrElse(partValue, Seq.empty)
@@ -439,7 +441,9 @@ class Spark35Shims extends SparkShims {
                   val row = parts.head.asInstanceOf[HasPartitionKey].partitionKey()
                   InternalRowComparableWrapper(row, p.expressions) -> parts
               }.toMap
-              finalPartitions = p.partitionKeys.map {
+              // When isGrouped is true, partitionKeys are already distinct.
+              val orderedKeys = if (p.isGrouped) p.partitionKeys else p.partitionKeys.distinct
+              finalPartitions = orderedKeys.map {
                 partValue =>
                   // Use empty partition for those partition values that are not present
                   partitionMapping.getOrElse(partValue, Seq.empty)
