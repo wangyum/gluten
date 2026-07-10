@@ -52,15 +52,13 @@ case class PaimonScanTransformer(
     override val runtimeFilters: Seq[Expression],
     @transient override val table: Table,
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
-    override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
     override val pushDownFilters: Option[Seq[Expression]] = None)
   extends BatchScanExecTransformerBase(
     output = output,
     scan = scan,
     runtimeFilters = runtimeFilters,
     table = table,
-    keyGroupedPartitioning = keyGroupedPartitioning,
-    commonPartitionValues = commonPartitionValues
+    keyGroupedPartitioning = keyGroupedPartitioning
   ) {
 
   private lazy val coreOptions: CoreOptions = scan match {
@@ -203,8 +201,7 @@ object PaimonScanTransformer {
       batchScan.scan,
       batchScan.runtimeFilters,
       table = SparkShimLoader.getSparkShims.getBatchScanExecTable(batchScan),
-      keyGroupedPartitioning = SparkShimLoader.getSparkShims.getKeyGroupedPartitioning(batchScan),
-      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScan)
+      keyGroupedPartitioning = SparkShimLoader.getSparkShims.getKeyGroupedPartitioning(batchScan)
     )
   }
 

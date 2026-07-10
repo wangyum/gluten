@@ -46,8 +46,7 @@ object ScanTransformerFactory {
       batchScanExec.runtimeFilters,
       table = SparkShimLoader.getSparkShims.getBatchScanExecTable(batchScanExec),
       keyGroupedPartitioning =
-        SparkShimLoader.getSparkShims.getKeyGroupedPartitioning(batchScanExec),
-      commonPartitionValues = SparkShimLoader.getSparkShims.getCommonPartitionValues(batchScanExec)
+        SparkShimLoader.getSparkShims.getKeyGroupedPartitioning(batchScanExec)
     )
   }
 }

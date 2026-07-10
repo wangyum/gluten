@@ -23,7 +23,6 @@ import org.apache.gluten.substrait.rel.LocalFilesNode.ReadFileFormat
 import org.apache.gluten.utils.FileIndexUtil
 
 import org.apache.spark.Partition
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.util.truncatedString
@@ -43,9 +42,6 @@ case class BatchScanExecTransformer(
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val ordering: Option[Seq[SortOrder]] = None,
     @transient override val table: Table,
-    override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
-    override val applyPartialClustering: Boolean = false,
-    override val replicatePartitions: Boolean = false,
     override val pushDownFilters: Option[Seq[Expression]] = None)
   extends BatchScanExecTransformerBase(
     output,
@@ -53,10 +49,7 @@ case class BatchScanExecTransformer(
     runtimeFilters,
     keyGroupedPartitioning,
     ordering,
-    table,
-    commonPartitionValues,
-    applyPartialClustering,
-    replicatePartitions) {
+    table) {
 
   protected[this] def supportsBatchScan(scan: Scan): Boolean = {
     scan.isInstanceOf[FileScan]
@@ -87,20 +80,14 @@ abstract class BatchScanExecTransformerBase(
     override val runtimeFilters: Seq[Expression],
     override val keyGroupedPartitioning: Option[Seq[Expression]] = None,
     override val ordering: Option[Seq[SortOrder]] = None,
-    @transient override val table: Table,
-    override val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
-    override val applyPartialClustering: Boolean = false,
-    override val replicatePartitions: Boolean = false)
+    @transient override val table: Table)
   extends BatchScanExecShim(
     output,
     scan,
     runtimeFilters,
     keyGroupedPartitioning,
     ordering,
-    table,
-    commonPartitionValues = commonPartitionValues,
-    applyPartialClustering = applyPartialClustering,
-    replicatePartitions = replicatePartitions
+    table
   )
   with BasicScanExecTransformer {
 
@@ -174,20 +161,10 @@ abstract class BatchScanExecTransformerBase(
     BackendsApiManager.getMetricsApiInstance.genBatchScanTransformerMetricsUpdater(metrics)
 
   @transient protected lazy val finalPartitions: Seq[Partition] =
-    SparkShimLoader.getSparkShims
-      .orderPartitions(
-        this,
-        scan,
-        keyGroupedPartitioning,
-        filteredPartitions,
-        outputPartitioning,
-        commonPartitionValues,
-        applyPartialClustering,
-        replicatePartitions)
-      .zipWithIndex
-      .map {
-        case (inputPartitions, index) => new SparkDataSourceRDDPartition(index, inputPartitions)
-      }
+    filteredPartitions.zipWithIndex.map {
+      case (inputPartition, index) =>
+        new SparkDataSourceRDDPartition(index, inputPartition.toSeq)
+    }
 
   @transient override lazy val fileFormat: ReadFileFormat =
     BackendsApiManager.getSettings.getSubstraitReadFileFormatV2(scan)

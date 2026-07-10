@@ -17,10 +17,8 @@
 package org.apache.spark.sql.execution.datasources.v2
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.connector.catalog.Table
-import org.apache.spark.sql.connector.catalog.functions.Reducer
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.Scan
 import org.apache.spark.sql.execution.datasources.v2.orc.OrcScan
@@ -34,25 +32,14 @@ abstract class BatchScanExecShim(
     runtimeFilters: Seq[Expression],
     keyGroupedPartitioning: Option[Seq[Expression]] = None,
     ordering: Option[Seq[SortOrder]] = None,
-    @transient val table: Table,
-    val joinKeyPositions: Option[Seq[Int]] = None,
-    val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
-    val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
-    val applyPartialClustering: Boolean = false,
-    val replicatePartitions: Boolean = false)
+    @transient val table: Table)
   extends AbstractBatchScanExec(
     output,
     scan,
     runtimeFilters,
     ordering,
     table,
-    StoragePartitionJoinParams(
-      keyGroupedPartitioning,
-      joinKeyPositions,
-      commonPartitionValues,
-      reducers,
-      applyPartialClustering,
-      replicatePartitions)
+    keyGroupedPartitioning
   ) {
 
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.
