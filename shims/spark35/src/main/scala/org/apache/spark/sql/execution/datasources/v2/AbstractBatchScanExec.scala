@@ -118,10 +118,7 @@ abstract class AbstractBatchScanExec(
     // inputPartitions temporarily empty), we fall back to building KeyedPartitioning from
     // inputPartitions directly.
     val basePartitioning =
-      if (
-        spjParams.keyGroupedPartitioning.isDefined &&
-        KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get)
-      ) {
+      if (spjParams.keyGroupedPartitioning.isDefined) {
         super.outputPartitioning match {
           case k: KeyedPartitioning => k
           case _ =>
