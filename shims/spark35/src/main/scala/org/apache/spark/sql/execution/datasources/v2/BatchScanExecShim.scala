@@ -46,13 +46,7 @@ abstract class BatchScanExecShim(
     runtimeFilters,
     ordering,
     table,
-    StoragePartitionJoinParams(
-      keyGroupedPartitioning,
-      joinKeyPositions,
-      commonPartitionValues,
-      reducers,
-      applyPartialClustering,
-      replicatePartitions)
+    keyGroupedPartitioning
   ) {
 
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.

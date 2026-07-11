@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition, UnknownPartitioning}
+import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, SinglePartition}
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
@@ -33,7 +33,7 @@ abstract class AbstractBatchScanExec(
     val runtimeFilters: Seq[Expression],
     ordering: Option[Seq[SortOrder]] = None,
     @transient table: Table,
-    val spjParams: StoragePartitionJoinParams = StoragePartitionJoinParams()
+    override val keyGroupedPartitioning: Option[Seq[Expression]] = None
 ) extends DataSourceV2ScanExecBase {
 
   @transient lazy val batch: Batch = if (scan == null) null else scan.toBatch
@@ -43,7 +43,7 @@ abstract class AbstractBatchScanExec(
     case other: AbstractBatchScanExec =>
       this.batch != null && this.batch == other.batch &&
       this.runtimeFilters == other.runtimeFilters &&
-      this.spjParams == other.spjParams
+      this.keyGroupedPartitioning == other.keyGroupedPartitioning
     case _ =>
       false
   }
@@ -107,45 +107,6 @@ abstract class AbstractBatchScanExec(
     }
   }
 
-  override def outputPartitioning: Partitioning = {
-    val basePartitioning = super.outputPartitioning match {
-      case p: UnknownPartitioning
-          if spjParams.keyGroupedPartitioning.isDefined &&
-            KeyedPartitioning.supportsExpressions(spjParams.keyGroupedPartitioning.get) =>
-        val expressions = spjParams.keyGroupedPartitioning.get
-        val hasPartitionKeyPartitions =
-          inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
-        if (hasPartitionKeyPartitions.isEmpty) {
-          // No HasPartitionKey partitions (e.g. table is empty or all partitions filtered out).
-          // Return a KeyedPartitioning with empty keys so that operators like GroupPartitionsExec
-          // which require a Partitioning with Expression can still function correctly.
-          KeyedPartitioning(expressions, Seq.empty)
-        } else {
-          val keyRowOrdering =
-            RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
-          val partitionKeys = hasPartitionKeyPartitions
-            .map(_.asInstanceOf[HasPartitionKey].partitionKey())
-            .sorted(keyRowOrdering)
-          KeyedPartitioning(expressions, partitionKeys)
-        }
-      case p => p
-    }
-
-    basePartitioning match {
-      case k: KeyedPartitioning if spjParams.commonPartitionValues.isDefined =>
-        // We allow duplicated partition values if
-        // `spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled` is true
-        val keyWrapperFactory = InternalRowComparableWrapper
-          .getInternalRowComparableWrapperFactory(k.expressions.map(_.dataType))
-        val newPartValues = spjParams.commonPartitionValues.get.flatMap {
-          case (partValue, numSplits) =>
-            Seq.fill(numSplits)(keyWrapperFactory(partValue))
-        }
-        k.copy(partitionKeys = newPartValues, isGrouped = false)
-      case p => p
-    }
-  }
-
   override lazy val readerFactory: PartitionReaderFactory = batch.createReaderFactory()
 
   override lazy val inputRDD: RDD[InternalRow] = {
@@ -163,9 +124,6 @@ abstract class AbstractBatchScanExec(
     postDriverMetrics()
     rdd
   }
-
-  override def keyGroupedPartitioning: Option[Seq[Expression]] =
-    spjParams.keyGroupedPartitioning
 
   override def simpleString(maxFields: Int): String = {
     val truncatedOutputString = truncatedString(output, "[", ", ", "]", maxFields)
