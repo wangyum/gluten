@@ -102,11 +102,6 @@ jobs:
           name: velox-native-lib-enhanced-centos-7-${{github.sha}}
           path: ./cpp/build/releases/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: arrow-jars-centos-7-${{github.sha}}
-          path: .m2/repository/org/apache/arrow/
-          if-no-files-found: error
 
   build-internal-dependency:
     runs-on: ubuntu-22.04
@@ -183,11 +178,6 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
-      - name: Download All Arrow Jar Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: arrow-jars-centos-7-${{github.sha}}
-          path: /root/.m2/repository/org/apache/arrow/
       - name: Setup tzdata
         run: |
           #sed -i 's|http://archive|http://us.archive|g' /etc/apt/sources.list
@@ -208,7 +198,6 @@ jobs:
             apt-get update && apt-get install -y openjdk-8-jdk wget
             apt remove openjdk-11* -y
           fi
-          ls -l /root/.m2/repository/org/apache/arrow/arrow-dataset/15.0.0-gluten/
       - name: Install Hadoop & Setup HDFS
         if: matrix.os == 'ubuntu:22.04' && matrix.spark == 'spark-3.5' && matrix.java == 'java-8'
         shell: bash
