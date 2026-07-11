@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition, UnknownPartitioning}
+import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning, SinglePartition}
 import org.apache.spark.sql.catalyst.util.{truncatedString, InternalRowComparableWrapper}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read._
@@ -108,27 +108,28 @@ abstract class AbstractBatchScanExec(
   }
 
   override def outputPartitioning: Partitioning = {
-    super.outputPartitioning match {
-      case p: UnknownPartitioning
-          if keyGroupedPartitioning.isDefined &&
-            KeyedPartitioning.supportsExpressions(keyGroupedPartitioning.get) =>
-        val expressions = keyGroupedPartitioning.get
-        val hasPartitionKeyPartitions =
-          inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
-        if (hasPartitionKeyPartitions.isEmpty) {
-          // No HasPartitionKey partitions (e.g. table is empty or all partitions filtered out).
-          // Return a KeyedPartitioning with empty keys so that operators like GroupPartitionsExec
-          // which require a Partitioning with Expression can still function correctly.
-          KeyedPartitioning(expressions, Seq.empty)
-        } else {
-          val keyRowOrdering =
-            RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
-          val partitionKeys = hasPartitionKeyPartitions
-            .map(_.asInstanceOf[HasPartitionKey].partitionKey())
-            .sorted(keyRowOrdering)
-          KeyedPartitioning(expressions, partitionKeys)
-        }
-      case p => p
+    if (
+      keyGroupedPartitioning.isDefined &&
+      KeyedPartitioning.supportsExpressions(keyGroupedPartitioning.get)
+    ) {
+      val expressions = keyGroupedPartitioning.get
+      val hasPartitionKeyPartitions =
+        inputPartitions.filter(_.isInstanceOf[HasPartitionKey])
+      if (hasPartitionKeyPartitions.isEmpty) {
+        // No HasPartitionKey partitions (e.g. table is empty or all partitions filtered out).
+        // Return a KeyedPartitioning with empty keys so that operators like GroupPartitionsExec
+        // which require a Partitioning with Expression can still function correctly.
+        KeyedPartitioning(expressions, Seq.empty)
+      } else {
+        val keyRowOrdering =
+          RowOrdering.createNaturalAscendingOrdering(expressions.map(_.dataType))
+        val partitionKeys = hasPartitionKeyPartitions
+          .map(_.asInstanceOf[HasPartitionKey].partitionKey())
+          .sorted(keyRowOrdering)
+        KeyedPartitioning(expressions, partitionKeys)
+      }
+    } else {
+      super.outputPartitioning
     }
   }
 
