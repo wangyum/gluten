@@ -30,6 +30,9 @@ import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 
 object FallbackUtil extends Logging with AdaptiveSparkPlanHelper {
 
+  private val GroupPartitionsExecClassName =
+    "org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec"
+
   def tolerate(plan: SparkPlan): Boolean = {
     plan match {
       case _: ColumnarToRowTransition =>
@@ -60,6 +63,8 @@ object FallbackUtil extends Logging with AdaptiveSparkPlanHelper {
       case _: LocalTableScanExec =>
         true
       case _: ReusedExchangeExec =>
+        true
+      case p if p.getClass.getName == GroupPartitionsExecClassName =>
         true
       case _ =>
         false

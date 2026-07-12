@@ -26,6 +26,12 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
   override protected val resourcePath: String = "/tpch-data-parquet"
   override protected val fileFormat: String = "parquet"
 
+  private def assertPartitionValueSplitCount(splitCount: Int): Unit = {
+    assert(
+      splitCount == 3 || (isSparkVersionGE("3.5") && splitCount == 2),
+      s"Unexpected split count $splitCount for bucketed join partition value tests")
+  }
+
   override protected def sparkConf: SparkConf = {
     super.sparkConf
       .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
@@ -296,7 +302,7 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               getExecutedPlan(df).map {
                 case plan: IcebergScanTransformer =>
                   assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
+                  assertPartitionValueSplitCount(plan.getSplitInfos.length)
                 case _ => // do nothing
               }
             }
@@ -373,7 +379,7 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               getExecutedPlan(df).map {
                 case plan: IcebergScanTransformer =>
                   assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
+                  assertPartitionValueSplitCount(plan.getSplitInfos.length)
                 case _ => // do nothing
               }
             }
