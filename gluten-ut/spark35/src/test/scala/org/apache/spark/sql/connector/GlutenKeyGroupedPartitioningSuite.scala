@@ -26,8 +26,8 @@ import org.apache.spark.sql.connector.distributions.Distributions
 import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SparkPlan}
-import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
-import org.apache.spark.sql.execution.exchange.ShuffleExchangeLike
+import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, GroupPartitionsExec}
+import org.apache.spark.sql.execution.exchange.{ShuffleExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -46,13 +46,57 @@ class GlutenKeyGroupedPartitioningSuite
   }
 
   override def collectAllShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
-    collect(plan) { case s: ColumnarShuffleExchangeExec => s }
+    collect(plan) {
+      case s: ColumnarShuffleExchangeExec => s
+      case s: ShuffleExchangeExec => s
+    }
+  }
+
+  override def collectAllGroupPartitions(plan: SparkPlan): Seq[GroupPartitionsExec] = {
+    collect(plan) {
+      case g: GroupPartitionsExec => g
+    }
   }
 
   override def collectShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
     // here we skip collecting shuffle operators that are not associated with SMJ
-    collect(plan) { case s: SortMergeJoinExecTransformer => s }.flatMap(
-      smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
+    collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+      case s: SortMergeJoinExec => s
+    }.flatMap(
+      smj =>
+        collect(smj) {
+          case s: ColumnarShuffleExchangeExec => s
+          case s: ShuffleExchangeExec => s
+        })
+  }
+
+  override def collectGroupPartitions(plan: SparkPlan): Seq[GroupPartitionsExec] = {
+    // here we skip collecting shuffle operators that are not associated with SMJ
+    collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+      case s: SortMergeJoinExec => s
+    }.flatMap(
+      smj =>
+        collect(smj) {
+          case g: GroupPartitionsExec => g
+        })
+  }.toSet.toSeq
+
+  override def collectSMJs(plan: SparkPlan): Seq[SparkPlan] = {
+    collect(plan) {
+      case j: SortMergeJoinExecTransformer => j
+      case j: SortMergeJoinExec => j
+    }
+  }
+
+  override def collectSortsForSMJ(smj: SparkPlan): Seq[SparkPlan] = {
+    smj.children.flatMap(
+      child =>
+        collect(child) {
+          case s: org.apache.gluten.execution.SortExecTransformer => s
+          case s: org.apache.spark.sql.execution.SortExec => s
+        })
   }
 
   private val emptyProps: java.util.Map[String, String] = {
@@ -76,12 +120,17 @@ class GlutenKeyGroupedPartitioningSuite
   }
 
   private def collectColumnarShuffleExchangeExec(
-      plan: SparkPlan): Seq[ColumnarShuffleExchangeExec] = {
+      plan: SparkPlan): Seq[ShuffleExchangeLike] = {
     // here we skip collecting shuffle operators that are not associated with SMJ
     collect(plan) {
       case s: SortMergeJoinExecTransformer => s
       case s: SortMergeJoinExec => s
-    }.flatMap(smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
+    }.flatMap(
+      smj =>
+        collect(smj) {
+          case s: ColumnarShuffleExchangeExec => s
+          case s: ShuffleExchangeExec => s
+        })
   }
   private def collectScans(plan: SparkPlan): Seq[BatchScanExec] = {
     collect(plan) { case s: BatchScanExec => s }
@@ -101,7 +150,8 @@ class GlutenKeyGroupedPartitioningSuite
   private def testWithCustomersAndOrders(
       customers_partitions: Array[Transform],
       orders_partitions: Array[Transform],
-      expectedNumOfShuffleExecs: Int): Unit = {
+      expectedNumOfShuffleExecs: Int,
+      expectedGroupPartitionsExecs: Int): Unit = {
     createTable(customers, customers_schema, customers_partitions)
     sql(
       s"INSERT INTO testcat.ns.$customers VALUES " +
@@ -120,6 +170,9 @@ class GlutenKeyGroupedPartitioningSuite
     val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
     assert(shuffles.length == expectedNumOfShuffleExecs)
 
+    val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+    assert(groupPartitions.length == expectedGroupPartitionsExecs)
+
     checkAnswer(
       df,
       Seq(
@@ -135,13 +188,13 @@ class GlutenKeyGroupedPartitioningSuite
     val customers_partitions = Array(bucket(4, "customer_id"))
     val orders_partitions = Array(bucket(2, "customer_id"))
 
-    testWithCustomersAndOrders(customers_partitions, orders_partitions, 2)
+    testWithCustomersAndOrders(customers_partitions, orders_partitions, 2, 0)
   }
   testGluten("partitioned join: exact distribution (same number of buckets) from both sides") {
     val customers_partitions = Array(bucket(4, "customer_id"))
     val orders_partitions = Array(bucket(4, "customer_id"))
 
-    testWithCustomersAndOrders(customers_partitions, orders_partitions, 0)
+    testWithCustomersAndOrders(customers_partitions, orders_partitions, 0, 1)
   }
 
   private val items: String = "items"
