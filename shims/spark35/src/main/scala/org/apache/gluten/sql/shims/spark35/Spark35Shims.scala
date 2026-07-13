@@ -31,13 +31,13 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.plans.physical.{KeyedPartitioning, Partitioning}
+import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
-import org.apache.spark.sql.catalyst.util.{InternalRowComparableWrapper, TimestampFormatter}
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec
+import org.apache.spark.sql.catalyst.util.TimestampFormatter
 import org.apache.spark.sql.connector.catalog.Table
-import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, Scan}
+import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.datasources._
@@ -350,28 +350,9 @@ class Spark35Shims extends SparkShims {
       applyPartialClustering: Boolean,
       replicatePartitions: Boolean,
       joinKeyPositions: Option[Seq[Int]] = None): Seq[Seq[InputPartition]] = {
-    scan match {
-      case _ if keyGroupedPartitioning.isDefined =>
-        var finalPartitions = filteredPartitions
-
-        outputPartitioning match {
-          case p: KeyedPartitioning =>
-            val partitionMapping = finalPartitions.map {
-              parts =>
-                val row = parts.head.asInstanceOf[HasPartitionKey].partitionKey()
-                InternalRowComparableWrapper(row, p.expressions) -> parts
-            }.toMap
-            finalPartitions = p.partitionKeys.map {
-              partValue =>
-                // Use empty partition for those partition values that are not present
-                partitionMapping.getOrElse(partValue, Seq.empty)
-            }
-          case _ =>
-        }
-        finalPartitions
-      case _ =>
-        filteredPartitions
-    }
+    // SPARK-55535 moved SPJ grouping logic from BatchScanExec to GroupPartitionsExec.
+    // filteredPartitions already handles key ordering, so this is a no-op.
+    filteredPartitions
   }
 
   override def withTryEvalMode(expr: Expression): Boolean = {

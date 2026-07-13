@@ -16,6 +16,7 @@
  */
 package org.apache.spark.sql.execution.datasources.v2
 
+import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -50,20 +51,16 @@ abstract class AbstractBatchScanExec(
 
   override def hashCode(): Int = Objects.hashCode(batch, runtimeFilters)
 
-  @transient override lazy val inputPartitions: Seq[InputPartition] = inputPartitionsShim
-
-  @transient protected lazy val inputPartitionsShim: Seq[InputPartition] =
-    batch.planInputPartitions()
+  @transient override lazy val inputPartitions: Seq[InputPartition] = batch.planInputPartitions()
 
   @transient protected lazy val filteredPartitions: Seq[Seq[InputPartition]] = {
     val dataSourceFilters = runtimeFilters.flatMap {
       case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
-      case _ => None
+      case f => DataSourceV2Strategy.translateScalarSubqueryFilterV2(f)
     }
 
+    val originalPartitioning = outputPartitioning
     if (dataSourceFilters.nonEmpty) {
-      val originalPartitioning = outputPartitioning
-
       // the cast is safe as runtime filters are only assigned if the scan can be filtered
       val filterableScan = scan.asInstanceOf[SupportsRuntimeV2Filtering]
       filterableScan.filter(dataSourceFilters.toArray)
@@ -73,37 +70,53 @@ abstract class AbstractBatchScanExec(
 
       originalPartitioning match {
         case k: KeyedPartitioning =>
-          val inputMap = k.partitionKeys
-            .groupBy(identity)
-            .map {
-              case (key, parts) => key -> parts.size
-            }
-            .toSeq
-            .sortBy(_._1)(k.keyOrdering)
-
-          val filteredMap = newPartitions
-            .groupBy(
-              p => InternalRowComparableWrapper(p.asInstanceOf[HasPartitionKey], k.expressions))
-            .map {
-              case (key, parts) => key -> parts.toSeq
-            }
-
-          inputMap.flatMap {
-            case (key, size) =>
-              // We require the new number of partitions to be equal or less than the old number
-              // of partitions for a given key. In the case of less than, empty partitions
-              // are added.
-              filteredMap.getOrElse(key, Seq.empty)
-                .map(Seq(_)).padTo(size, Seq.empty)
+          if (newPartitions.exists(!_.isInstanceOf[HasPartitionKey])) {
+            throw new SparkException("Data source must have preserved the original partitioning " +
+              "during runtime filtering: not all partitions implement HasPartitionKey after " +
+              "filtering")
           }
+
+          val inputMap = k.partitionKeys.groupBy(identity).mapValues(_.size)
+          val comparableKeyWrapperFactory = InternalRowComparableWrapper
+            .getInternalRowComparableWrapperFactory(k.expressionDataTypes)
+          val filteredMap = newPartitions.groupBy(
+            p => comparableKeyWrapperFactory(p.asInstanceOf[HasPartitionKey].partitionKey()))
+
+          if (!filteredMap.keySet.subsetOf(inputMap.keySet)) {
+            throw new SparkException("During runtime filtering, data source must not report new " +
+              "partition keys that are not present in the original partitioning.")
+          }
+
+          inputMap.toSeq
+            .sortBy(_._1)(k.keyOrdering)
+            .flatMap {
+              case (key, size) =>
+                // We require the new number of partitions to be equal or less than the old number of
+                // partitions for a given key. In the case of less than, empty partitions are added.
+                val fps = filteredMap.getOrElse(key, Array.empty)
+
+                if (fps.size > size) {
+                  throw new SparkException(
+                    "During runtime filtering, data source must not report " +
+                      s"new partitions for a given key. Before: $size partitions. " +
+                      s"After: ${fps.size} partitions")
+                }
+
+                fps.map(p => Seq(p)).padTo(size, Seq.empty)
+            }
+
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
-          newPartitions.map(Seq(_))
+          newPartitions.toSeq.map(Seq(_))
       }
 
     } else {
-      partitions
-        .map(_.toSeq)
+      (originalPartitioning match {
+        case k: KeyedPartitioning =>
+          inputPartitions.sortBy(_.asInstanceOf[HasPartitionKey].partitionKey())(k.keyRowOrdering)
+
+        case _ => inputPartitions
+      }).map(Seq(_))
     }
   }
 
