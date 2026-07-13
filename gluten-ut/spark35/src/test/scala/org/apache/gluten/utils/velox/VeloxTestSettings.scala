@@ -70,6 +70,11 @@ class VeloxTestSettings extends BackendTestSettings {
     .excludeByPrefix("SPARK-41471: shuffle one side")
     .exclude("SPARK-44647: shuffle one side and join keys are less than partition keys")
     .excludeByPrefix("SPARK-48012: one-side shuffle with partition transforms")
+    // Gluten columnar transforms change plan shapes expected by k-way merge tests
+    .excludeByPrefix("SPARK-55715: preserve outputOrdering when coalescing")
+    .exclude("SPARK-56549: k-way merge enabled only when parent requires ordering")
+    // Checkpointed scans not supported in Gluten
+    .excludeByPrefix("SPARK-53322: checkpointed scans")
   enableSuite[GlutenLocalScanSuite]
   enableSuite[GlutenMetadataColumnSuite]
   enableSuite[GlutenSupportsCatalogOptionsSuite]

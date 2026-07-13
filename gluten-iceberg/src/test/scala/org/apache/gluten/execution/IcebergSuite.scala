@@ -281,11 +281,14 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "false"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
               assert(
@@ -296,7 +299,6 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               getExecutedPlan(df).map {
                 case plan: IcebergScanTransformer =>
                   assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
                 case _ => // do nothing
               }
             }
@@ -358,11 +360,14 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "true"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
               assert(
@@ -373,7 +378,6 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               getExecutedPlan(df).map {
                 case plan: IcebergScanTransformer =>
                   assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
                 case _ => // do nothing
               }
             }

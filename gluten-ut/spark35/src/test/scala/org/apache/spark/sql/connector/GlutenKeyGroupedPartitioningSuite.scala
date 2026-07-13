@@ -26,7 +26,7 @@ import org.apache.spark.sql.connector.distributions.Distributions
 import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SparkPlan}
-import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeLike
 import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 import org.apache.spark.sql.internal.SQLConf
@@ -53,6 +53,18 @@ class GlutenKeyGroupedPartitioningSuite
     // here we skip collecting shuffle operators that are not associated with SMJ
     collect(plan) { case s: SortMergeJoinExecTransformer => s }.flatMap(
       smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
+  }
+
+  override protected def collectGroupPartitions(plan: SparkPlan): Seq[GroupPartitionsExec] = {
+    // here we skip collecting group partitions that are not associated with SMJ
+    (collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+      case s: SortMergeJoinExec => s
+    }).flatMap(
+      smj =>
+        collect(smj) {
+          case g: GroupPartitionsExec => g
+        }).toSet.toSeq
   }
 
   private val emptyProps: java.util.Map[String, String] = {
@@ -82,9 +94,6 @@ class GlutenKeyGroupedPartitioningSuite
       case s: SortMergeJoinExecTransformer => s
       case s: SortMergeJoinExec => s
     }.flatMap(smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
-  }
-  private def collectScans(plan: SparkPlan): Seq[BatchScanExec] = {
-    collect(plan) { case s: BatchScanExec => s }
   }
 
   private val customers: String = "customers"
@@ -317,8 +326,8 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               assert(shuffles.isEmpty, "should not contain any shuffle")
               if (pushDownValues) {
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.forall(_.inputRDD.partitions.length == expected))
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.forall(_.outputPartitioning.numPartitions == expected))
               }
               checkAnswer(
                 df,
@@ -373,8 +382,8 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               assert(shuffles.isEmpty, "should not contain any shuffle")
               if (pushDownValues) {
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.forall(_.inputRDD.partitions.length == expected))
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.forall(_.outputPartitioning.numPartitions == expected))
               }
               checkAnswer(
                 df,
@@ -439,8 +448,8 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.forall(_.inputRDD.partitions.length == expected))
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.forall(_.outputPartitioning.numPartitions == expected))
               } else {
                 assert(
                   shuffles.nonEmpty,
@@ -508,8 +517,8 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.forall(_.inputRDD.partitions.length == expected))
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.forall(_.outputPartitioning.numPartitions == expected))
               } else {
                 assert(
                   shuffles.nonEmpty,
@@ -566,8 +575,8 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.forall(_.inputRDD.partitions.length == expected))
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.forall(_.outputPartitioning.numPartitions == expected))
               } else {
                 assert(
                   shuffles.nonEmpty,
@@ -621,10 +630,12 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
                 assert(
-                  scans.forall(_.inputRDD.partitions.length == expected),
-                  s"Expected $expected but got ${scans.head.inputRDD.partitions.length}")
+                  groupPartitions.forall(_.outputPartitioning.numPartitions == expected),
+                  s"Expected $expected but got " +
+                    s"${groupPartitions.headOption.map(_.outputPartitioning.numPartitions)}"
+                )
               } else {
                 assert(
                   shuffles.nonEmpty,
@@ -685,11 +696,13 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.map(_.inputRDD.partitions.length).toSet.size == 1)
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.map(_.outputPartitioning.numPartitions).toSet.size == 1)
                 assert(
-                  scans.forall(_.inputRDD.partitions.length == expected),
-                  s"Expected $expected but got ${scans.head.inputRDD.partitions.length}")
+                  groupPartitions.forall(_.outputPartitioning.numPartitions == expected),
+                  s"Expected $expected but got " +
+                    s"${groupPartitions.headOption.map(_.outputPartitioning.numPartitions)}"
+                )
               } else {
                 assert(
                   shuffles.nonEmpty,
@@ -748,11 +761,13 @@ class GlutenKeyGroupedPartitioningSuite
               val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
               if (pushDownValues) {
                 assert(shuffles.isEmpty, "should not contain any shuffle")
-                val scans = collectScans(df.queryExecution.executedPlan)
-                assert(scans.map(_.inputRDD.partitions.length).toSet.size == 1)
+                val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+                assert(groupPartitions.map(_.outputPartitioning.numPartitions).toSet.size == 1)
                 assert(
-                  scans.forall(_.inputRDD.partitions.length == expected),
-                  s"Expected $expected but got ${scans.head.inputRDD.partitions.length}")
+                  groupPartitions.forall(_.outputPartitioning.numPartitions == expected),
+                  s"Expected $expected but got " +
+                    s"${groupPartitions.headOption.map(_.outputPartitioning.numPartitions)}"
+                )
               } else {
                 assert(
                   shuffles.nonEmpty,
