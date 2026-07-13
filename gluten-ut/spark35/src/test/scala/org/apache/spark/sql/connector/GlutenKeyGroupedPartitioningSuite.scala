@@ -944,13 +944,29 @@ class GlutenKeyGroupedPartitioningSuite
         s"(1, 42.0, cast('2020-01-01' as timestamp)), " +
         s"(2, 11.0, cast('2020-01-01' as timestamp))")
 
-    val df = sql(
-      "SELECT id, name, i.price as purchase_price, p.price as sale_price " +
-        s"FROM testcat.ns.$items i JOIN testcat.ns.$purchases p " +
-        "ON i.id = p.item_id AND i.arrive_time = p.time ORDER BY id, purchase_price, sale_price")
+    Seq(true, false).foreach {
+      pushDownValues =>
+        withSQLConf(SQLConf.V2_BUCKETING_PUSH_PART_VALUES_ENABLED.key -> pushDownValues.toString) {
+          val df = sql(
+            "SELECT id, name, i.price as purchase_price, p.price as sale_price " +
+              s"FROM testcat.ns.$items i JOIN testcat.ns.$purchases p " +
+              "ON i.id = p.item_id AND i.arrive_time = p.time " +
+              "ORDER BY id, purchase_price, sale_price")
 
-    val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
-    assert(shuffles.nonEmpty, "should add shuffle when partition keys mismatch")
+          val shuffles = collectColumnarShuffleExchangeExec(df.queryExecution.executedPlan)
+          val groupPartitions = collectGroupPartitions(df.queryExecution.executedPlan)
+          if (pushDownValues) {
+            assert(shuffles.isEmpty, "should not add shuffle when partition values mismatch")
+            assert(
+              groupPartitions.size === 2,
+              "should add group partitions when partition values mismatch")
+          } else {
+            assert(shuffles.nonEmpty, "should add shuffle when partition keys mismatch")
+          }
+
+          checkAnswer(df, Seq(Row(1, "aa", 40.0, 42.0), Row(2, "bb", 10.0, 11.0)))
+        }
+    }
   }
 
   testGluten("data source partitioning + dynamic partition filtering") {

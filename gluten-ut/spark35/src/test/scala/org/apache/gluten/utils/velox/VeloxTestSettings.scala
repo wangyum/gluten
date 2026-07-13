@@ -75,6 +75,16 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-56549: k-way merge enabled only when parent requires ordering")
     // Checkpointed scans not supported in Gluten
     .excludeByPrefix("SPARK-53322: checkpointed scans")
+    // Parent test uses private collectScans which looks for BatchScanExec
+    .exclude("SPARK-55092: Scans should not group partitions")
+    // Gluten convention transitions change plan shapes expected by these tests
+    .exclude("SPARK-54439: KeyedPartitioning with transform and join key size mismatch")
+    .exclude(
+      "SPARK-55411: Fix ArrayIndexOutOfBoundsException when join keys are less than cluster keys")
+    .excludeByPrefix(
+      "SPARK-56241: GroupPartitionsExec non-coalescing passes through child ordering")
+    .excludeByPrefix(
+      "SPARK-56241: GroupPartitionsExec coalescing derives ordering from key expressions")
   enableSuite[GlutenLocalScanSuite]
   enableSuite[GlutenMetadataColumnSuite]
   enableSuite[GlutenSupportsCatalogOptionsSuite]
@@ -811,7 +821,13 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("function to_date")
   enableSuite[GlutenDeprecatedAPISuite]
   enableSuite[GlutenDynamicPartitionPruningV1SuiteAEOff]
+    .exclude(
+      "SPARK-32509: Unused Dynamic Pruning filter shouldn't affect " +
+        "canonicalization and exchange reuse")
   enableSuite[GlutenDynamicPartitionPruningV1SuiteAEOn]
+    .exclude(
+      "SPARK-32509: Unused Dynamic Pruning filter shouldn't affect " +
+        "canonicalization and exchange reuse")
   enableSuite[GlutenDynamicPartitionPruningV1SuiteAEOnDisableScan]
   enableSuite[GlutenDynamicPartitionPruningV1SuiteAEOffDisableScan]
   enableSuite[GlutenDynamicPartitionPruningV2SuiteAEOff]
