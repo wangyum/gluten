@@ -17,18 +17,19 @@
 package org.apache.spark.sql.connector
 
 import org.apache.gluten.config.GlutenConfig
-import org.apache.gluten.execution.SortMergeJoinExecTransformer
+import org.apache.gluten.execution.{ShuffledHashJoinExecTransformerBase, SortExecTransformer, SortMergeJoinExecTransformer}
 
 import org.apache.spark.SparkConf
+import org.apache.spark.rdd.SortedMergeCoalescedRDD
 import org.apache.spark.sql.{GlutenSQLTestsBaseTrait, Row}
 import org.apache.spark.sql.connector.catalog.{Identifier, InMemoryTableCatalog}
 import org.apache.spark.sql.connector.distributions.Distributions
-import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity}
-import org.apache.spark.sql.connector.expressions.Transform
-import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SparkPlan}
+import org.apache.spark.sql.connector.expressions.{FieldReference, NullOrdering, SortDirection, Transform}
+import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity, sort}
+import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SortExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec
 import org.apache.spark.sql.execution.exchange.{ShuffleExchangeExec, ShuffleExchangeLike}
-import org.apache.spark.sql.execution.joins.SortMergeJoinExec
+import org.apache.spark.sql.execution.joins.{ShuffledHashJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
@@ -62,6 +63,22 @@ class GlutenKeyGroupedPartitioningSuite
         collect(smj) {
           case s: ColumnarShuffleExchangeExec => s
           case s: ShuffleExchangeExec => s
+        })
+  }
+
+  override protected def collectSMJs(plan: SparkPlan): Seq[SparkPlan] = {
+    collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+      case s: SortMergeJoinExec => s
+    }
+  }
+
+  override protected def collectSortsForSMJ(smj: SparkPlan): Seq[SparkPlan] = {
+    smj.children.flatMap(
+      child =>
+        collect(child) {
+          case s: SortExecTransformer => s
+          case s: SortExec => s
         })
   }
 
@@ -164,6 +181,9 @@ class GlutenKeyGroupedPartitioningSuite
   }
 
   private val items: String = "items"
+  private def selectWithMergeJoinHint(t1: String, t2: String): String = {
+    s"SELECT /*+ MERGE($t1, $t2) */ "
+  }
   private val items_schema: StructType = new StructType()
     .add("id", LongType)
     .add("name", StringType)
@@ -1027,6 +1047,131 @@ class GlutenKeyGroupedPartitioningSuite
             assert(shuffles.isEmpty, "should not add shuffle for both sides of the join")
             checkAnswer(df, Seq(Row(303.5)))
           }
+      }
+    }
+  }
+
+  testGluten("SPARK-56549: k-way merge enabled only when parent requires ordering") {
+    // Both tables are partitioned by id/item_id and report a two-column ordering.
+    // Key 1 appears on two splits on each side, so GroupPartitionsExec must coalesce.
+    //
+    // Dynamic gate: with the config enabled, k-way merge must be activated only when the parent
+    // actually requires ordering (SMJ), and must stay off when the parent does not (hash join).
+    val itemOrdering = Array(
+      sort(FieldReference("id"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+      sort(FieldReference("arrive_time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+    )
+    catalog.createTable(
+      Identifier.of(Array("ns"), items),
+      items_schema,
+      Array(identity("id")),
+      emptyProps,
+      Distributions.unspecified(),
+      itemOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1)
+    sql(s"INSERT INTO testcat.ns.$items VALUES " +
+      s"(2, 'cc', 30.0, cast('2023-06-15' as timestamp)), " +
+      s"(1, 'bb', 20.0, cast('2022-03-10' as timestamp)), " +
+      s"(3, 'dd', 40.0, cast('2024-01-01' as timestamp)), " +
+      s"(1, 'aa', 10.0, cast('2021-05-20' as timestamp)), " +
+      s"(2, 'ee', 50.0, cast('2025-09-01' as timestamp))")
+
+    val purchaseOrdering = Array(
+      sort(FieldReference("item_id"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+      sort(FieldReference("time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+    )
+    catalog.createTable(
+      Identifier.of(Array("ns"), purchases),
+      purchases_schema,
+      Array(identity("item_id")),
+      emptyProps,
+      Distributions.unspecified(),
+      purchaseOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1
+    )
+    sql(s"INSERT INTO testcat.ns.$purchases VALUES " +
+      s"(2, 50.0, cast('2025-09-01' as timestamp)), " +
+      s"(1, 10.0, cast('2021-05-20' as timestamp)), " +
+      s"(3, 40.0, cast('2024-01-01' as timestamp)), " +
+      s"(2, 30.0, cast('2023-06-15' as timestamp)), " +
+      s"(1, 20.0, cast('2022-03-10' as timestamp))")
+
+    withSQLConf(
+      SQLConf.REQUIRE_ALL_CLUSTER_KEYS_FOR_CO_PARTITION.key -> "false",
+      SQLConf.V2_BUCKETING_PRESERVE_ORDERING_ON_COALESCE_ENABLED.key -> "true"
+    ) {
+      val hashDf = sql(
+        s"""
+           |SELECT /*+ SHUFFLE_HASH(i, p) */ i.id, i.name
+           |FROM testcat.ns.$items i
+           |JOIN testcat.ns.$purchases p ON p.item_id = i.id AND p.time = i.arrive_time
+           |""".stripMargin)
+      checkAnswer(hashDf, Seq(Row(1, "aa"), Row(1, "bb"), Row(2, "cc"), Row(2, "ee"), Row(3, "dd")))
+      val hashPlan = hashDf.queryExecution.executedPlan
+      assert(
+        collect(hashPlan) {
+          case j: ShuffledHashJoinExec => j
+          case j: ShuffledHashJoinExecTransformerBase => j
+        }.nonEmpty,
+        "expected ShuffledHashJoinExec")
+      assert(collectAllShuffles(hashPlan).isEmpty, "should not shuffle for compatible partitioning")
+      val hashCoalescing =
+        collectAllGroupPartitions(hashPlan).filter(_.groupedPartitions.exists(_._2.size > 1))
+      assert(hashCoalescing.nonEmpty, "expected coalescing GroupPartitionsExec")
+      hashCoalescing.foreach {
+        gp =>
+          assert(
+            !gp.enableSortedMerge,
+            "hash join does not require ordering: enableSortedMerge must stay false")
+          // In Gluten, the child of GroupPartitionsExec may be columnar-only, so use
+          // executeColumnar() when supportsColumnar is true.
+          val rdd = if (gp.supportsColumnar) gp.executeColumnar() else gp.execute()
+          assert(
+            !rdd.isInstanceOf[SortedMergeCoalescedRDD[_]],
+            "hash join does not require ordering: must use simple CoalescedRDD")
+      }
+
+      val smjDf = sql(
+        s"""
+           |${selectWithMergeJoinHint("i", "p")}
+           |i.id, i.name
+           |FROM testcat.ns.$items i
+           |JOIN testcat.ns.$purchases p ON p.item_id = i.id AND p.time = i.arrive_time
+           |""".stripMargin)
+      checkAnswer(smjDf, Seq(Row(1, "aa"), Row(1, "bb"), Row(2, "cc"), Row(2, "ee"), Row(3, "dd")))
+      val smjPlan = smjDf.queryExecution.executedPlan
+      val smjs = collectSMJs(smjPlan)
+      assert(smjs.nonEmpty, "expected SortMergeJoinExec")
+      assert(collectAllShuffles(smjPlan).isEmpty, "should not shuffle for compatible partitioning")
+      val smjCoalescing =
+        collectAllGroupPartitions(smjPlan).filter(_.groupedPartitions.exists(_._2.size > 1))
+      assert(smjCoalescing.nonEmpty, "expected coalescing GroupPartitionsExec")
+      if (smjCoalescing.forall(_.enableSortedMerge)) {
+        smjCoalescing.foreach {
+          gp =>
+            if (gp.supportsColumnar) {
+              // Columnar path: doExecuteColumnar always uses CoalescedRDD, not SortedMerge.
+              assert(
+                !gp.executeColumnar().isInstanceOf[SortedMergeCoalescedRDD[_]],
+                "columnar path should use CoalescedRDD")
+            } else {
+              // Row-based path: doExecute should use SortedMergeCoalescedRDD.
+              assert(
+                gp.execute().isInstanceOf[SortedMergeCoalescedRDD[_]],
+                "sort-merge join requires ordering: must use SortedMergeCoalescedRDD")
+            }
+        }
+      } else {
+        // In this branch, additional safety checks may keep k-way merge disabled and rely on
+        // SortExec to satisfy SMJ ordering requirements.
+        val sortsBeforeSmj = smjs.flatMap(smj => collectSortsForSMJ(smj))
+        assert(
+          sortsBeforeSmj.nonEmpty,
+          "if sorted merge is not enabled, SMJ should be satisfied via SortExec")
       }
     }
   }
