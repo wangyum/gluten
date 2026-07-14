@@ -66,16 +66,11 @@ class VeloxTestSettings extends BackendTestSettings {
     // Rewritten
     .exclude("Fallback Parquet V2 to V1")
   enableSuite[GlutenKeyGroupedPartitioningSuite]
-    // Issue 10992: scala.MatchError: keygroupedpartitioning
-    .excludeByPrefix("SPARK-41471: shuffle one side")
-    .exclude("SPARK-44647: shuffle one side and join keys are less than partition keys")
-    .excludeByPrefix("SPARK-48012: one-side shuffle with partition transforms")
     // SPARK-56549: overridden as testGluten, exclude the parent test
     .exclude("SPARK-56549: k-way merge enabled only when parent requires ordering")
-    // SPARK-55715: k-way merge (SortedMergeCoalescedRDD) not supported through Gluten convention transitions
-    .excludeByPrefix("SPARK-55715: preserve outputOrdering when coalescing")
-    // Checkpointed scans not supported in Gluten
-    .excludeByPrefix("SPARK-53322: checkpointed scans")
+    // SPARK-55715: overridden as testGluten to handle Gluten's columnar execution path
+    .exclude("SPARK-55715: preserve outputOrdering when coalescing partitions with sorted merge")
+    .exclude("SPARK-55715: preserve outputOrdering when coalescing transform-partitioned splits")
   enableSuite[GlutenLocalScanSuite]
   enableSuite[GlutenMetadataColumnSuite]
   enableSuite[GlutenSupportsCatalogOptionsSuite]

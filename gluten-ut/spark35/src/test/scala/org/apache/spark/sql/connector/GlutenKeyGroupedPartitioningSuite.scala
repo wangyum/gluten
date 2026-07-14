@@ -25,7 +25,7 @@ import org.apache.spark.sql.{GlutenSQLTestsBaseTrait, Row}
 import org.apache.spark.sql.connector.catalog.{Identifier, InMemoryTableCatalog}
 import org.apache.spark.sql.connector.distributions.Distributions
 import org.apache.spark.sql.connector.expressions.{FieldReference, NullOrdering, SortDirection, Transform}
-import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity, sort}
+import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, identity, sort, years}
 import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SortExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec
 import org.apache.spark.sql.execution.exchange.{ShuffleExchangeExec, ShuffleExchangeLike}
@@ -1173,6 +1173,177 @@ class GlutenKeyGroupedPartitioningSuite
           sortsBeforeSmj.nonEmpty,
           "if sorted merge is not enabled, SMJ should be satisfied via SortExec")
       }
+    }
+  }
+
+  testGluten(
+    "SPARK-55715: preserve outputOrdering when coalescing partitions with sorted merge") {
+    val itemOrdering = Array(
+      sort(FieldReference("id"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+      sort(FieldReference("arrive_time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+    )
+    catalog.createTable(
+      Identifier.of(Array("ns"), items),
+      items_schema,
+      Array(identity("id")),
+      emptyProps,
+      Distributions.unspecified(),
+      itemOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1)
+    sql(s"INSERT INTO testcat.ns.$items VALUES " +
+      s"(2, 'cc', 30.0, cast('2023-06-15' as timestamp)), " +
+      s"(1, 'bb', 20.0, cast('2022-03-10' as timestamp)), " +
+      s"(3, 'dd', 40.0, cast('2024-01-01' as timestamp)), " +
+      s"(1, 'aa', 10.0, cast('2021-05-20' as timestamp)), " +
+      s"(2, 'ee', 50.0, cast('2025-09-01' as timestamp))")
+
+    val purchaseOrdering = Array(
+      sort(FieldReference("item_id"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+      sort(FieldReference("time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST)
+    )
+    catalog.createTable(
+      Identifier.of(Array("ns"), purchases),
+      purchases_schema,
+      Array(identity("item_id")),
+      emptyProps,
+      Distributions.unspecified(),
+      purchaseOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1
+    )
+    sql(s"INSERT INTO testcat.ns.$purchases VALUES " +
+      s"(2, 50.0, cast('2025-09-01' as timestamp)), " +
+      s"(1, 10.0, cast('2021-05-20' as timestamp)), " +
+      s"(3, 40.0, cast('2024-01-01' as timestamp)), " +
+      s"(2, 30.0, cast('2023-06-15' as timestamp)), " +
+      s"(1, 20.0, cast('2022-03-10' as timestamp))")
+
+    Seq(true, false).foreach {
+      preserveOrdering =>
+        withSQLConf(
+          SQLConf.REQUIRE_ALL_CLUSTER_KEYS_FOR_CO_PARTITION.key -> "false",
+          SQLConf.V2_BUCKETING_ALLOW_JOIN_KEYS_SUBSET_OF_PARTITION_KEYS.key -> "true",
+          SQLConf.V2_BUCKETING_PRESERVE_ORDERING_ON_COALESCE_ENABLED.key ->
+            preserveOrdering.toString
+        ) {
+          val df = sql(
+            s"""
+               |${selectWithMergeJoinHint("i", "p")}
+               |i.id, i.name
+               |FROM testcat.ns.$items i
+               |JOIN testcat.ns.$purchases p ON p.item_id = i.id AND p.time = i.arrive_time
+               |""".stripMargin)
+          checkAnswer(
+            df,
+            Seq(
+              Row(1, "aa"),
+              Row(1, "bb"),
+              Row(2, "cc"),
+              Row(2, "ee"),
+              Row(3, "dd")))
+
+          val plan = df.queryExecution.executedPlan
+          assert(collectAllShuffles(plan).isEmpty, "should not contain any shuffle")
+
+          val groupPartitions = collectAllGroupPartitions(plan)
+          assert(groupPartitions.nonEmpty, "should contain GroupPartitionsExec for coalescing")
+          assert(
+            groupPartitions.exists(_.groupedPartitions.exists(_._2.size > 1)),
+            "expected coalescing GroupPartitionsExec")
+
+          val smjs = collectSMJs(plan)
+          assert(smjs.nonEmpty, "expected SortMergeJoinExec in plan")
+          // Gluten's native execution nodes share native state across partitions and are not
+          // SafeForKWayMerge, so SortedMergeCoalescedRDD is not activated. A SortExec is always
+          // added to satisfy SMJ ordering, regardless of the config. This is a known limitation.
+          smjs.foreach {
+            smj =>
+              assert(
+                collectSortsForSMJ(smj).nonEmpty,
+                "Gluten does not support k-way merge: SortExec should be present before SMJ")
+          }
+        }
+    }
+  }
+
+  testGluten(
+    "SPARK-55715: preserve outputOrdering when coalescing transform-partitioned splits") {
+    val itemOrdering = Array(
+      sort(FieldReference("arrive_time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST))
+    catalog.createTable(
+      Identifier.of(Array("ns"), items),
+      items_schema,
+      Array(years("arrive_time")),
+      emptyProps,
+      Distributions.unspecified(),
+      itemOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1
+    )
+    sql(s"INSERT INTO testcat.ns.$items VALUES " +
+      s"(2, 'bb', 20.0, cast('2022-09-20' as timestamp)), " +
+      s"(4, 'dd', 40.0, cast('2023-11-05' as timestamp)), " +
+      s"(1, 'aa', 10.0, cast('2022-03-15' as timestamp)), " +
+      s"(3, 'cc', 30.0, cast('2023-01-10' as timestamp))")
+
+    val purchaseOrdering = Array(
+      sort(FieldReference("time"), SortDirection.ASCENDING, NullOrdering.NULLS_FIRST))
+    catalog.createTable(
+      Identifier.of(Array("ns"), purchases),
+      purchases_schema,
+      Array(years("time")),
+      emptyProps,
+      Distributions.unspecified(),
+      purchaseOrdering,
+      None,
+      None,
+      numRowsPerSplit = 1
+    )
+    sql(s"INSERT INTO testcat.ns.$purchases VALUES " +
+      s"(2, 20.0, cast('2022-09-20' as timestamp)), " +
+      s"(4, 40.0, cast('2023-11-05' as timestamp)), " +
+      s"(1, 10.0, cast('2022-03-15' as timestamp)), " +
+      s"(3, 30.0, cast('2023-01-10' as timestamp))")
+
+    Seq(true, false).foreach {
+      preserveOrdering =>
+        withSQLConf(
+          SQLConf.V2_BUCKETING_PRESERVE_ORDERING_ON_COALESCE_ENABLED.key ->
+            preserveOrdering.toString) {
+          val df = sql(
+            s"""
+               |${selectWithMergeJoinHint("i", "p")}
+               |i.id, i.name
+               |FROM testcat.ns.$items i
+               |JOIN testcat.ns.$purchases p ON p.time = i.arrive_time
+               |""".stripMargin)
+          checkAnswer(df, Seq(Row(1, "aa"), Row(2, "bb"), Row(3, "cc"), Row(4, "dd")))
+
+          val plan = df.queryExecution.executedPlan
+          assert(collectAllShuffles(plan).isEmpty, "should not contain any shuffle")
+
+          val groupPartitions = collectAllGroupPartitions(plan)
+          assert(groupPartitions.nonEmpty, "should contain GroupPartitionsExec for coalescing")
+          assert(
+            groupPartitions.exists(_.groupedPartitions.exists(_._2.size > 1)),
+            "expected coalescing GroupPartitionsExec")
+
+          val smjs = collectSMJs(plan)
+          assert(smjs.nonEmpty, "expected SortMergeJoinExec in plan")
+          // Gluten's native execution nodes share native state across partitions and are not
+          // SafeForKWayMerge, so SortedMergeCoalescedRDD is not activated. A SortExec is always
+          // added to satisfy SMJ ordering, regardless of the config. This is a known limitation.
+          smjs.foreach {
+            smj =>
+              assert(
+                collectSortsForSMJ(smj).nonEmpty,
+                "Gluten does not support k-way merge: SortExec should be present before SMJ")
+          }
+        }
     }
   }
 }
