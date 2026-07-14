@@ -27,7 +27,7 @@ import org.apache.spark.sql.connector.expressions.Expressions.{bucket, days, ide
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.v2.GroupPartitionsExec
-import org.apache.spark.sql.execution.exchange.ShuffleExchangeLike
+import org.apache.spark.sql.execution.exchange.{ShuffleExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.joins.SortMergeJoinExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -46,13 +46,23 @@ class GlutenKeyGroupedPartitioningSuite
   }
 
   override def collectAllShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
-    collect(plan) { case s: ColumnarShuffleExchangeExec => s }
+    collect(plan) {
+      case s: ColumnarShuffleExchangeExec => s
+      case s: ShuffleExchangeExec => s
+    }
   }
 
   override def collectShuffles(plan: SparkPlan): Seq[ShuffleExchangeLike] = {
     // here we skip collecting shuffle operators that are not associated with SMJ
-    collect(plan) { case s: SortMergeJoinExecTransformer => s }.flatMap(
-      smj => collect(smj) { case s: ColumnarShuffleExchangeExec => s })
+    (collect(plan) {
+      case s: SortMergeJoinExecTransformer => s
+      case s: SortMergeJoinExec => s
+    }).flatMap(
+      smj =>
+        collect(smj) {
+          case s: ColumnarShuffleExchangeExec => s
+          case s: ShuffleExchangeExec => s
+        })
   }
 
   override protected def collectGroupPartitions(plan: SparkPlan): Seq[GroupPartitionsExec] = {

@@ -77,11 +77,6 @@ class VeloxTestSettings extends BackendTestSettings {
     .excludeByPrefix("SPARK-53322: checkpointed scans")
     // Parent test uses private collectScans which looks for BatchScanExec
     .exclude("SPARK-55092: Scans should not group partitions")
-    // Gluten convention transitions change plan shapes expected by these tests
-    .exclude("SPARK-54439: KeyedPartitioning with transform and join key size mismatch")
-    .exclude("SPARK-54439: KeyedPartitioning and join key size mismatch")
-    .exclude(
-      "SPARK-55411: Fix ArrayIndexOutOfBoundsException when join keys are less than cluster keys")
     .excludeByPrefix(
       "SPARK-56241: GroupPartitionsExec non-coalescing passes through child ordering")
     .excludeByPrefix(
