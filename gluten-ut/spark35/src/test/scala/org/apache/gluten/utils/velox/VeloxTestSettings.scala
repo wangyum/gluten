@@ -86,12 +86,6 @@ class VeloxTestSettings extends BackendTestSettings {
       "SPARK-56241: GroupPartitionsExec non-coalescing passes through child ordering")
     .excludeByPrefix(
       "SPARK-56241: GroupPartitionsExec coalescing derives ordering from key expressions")
-    // SPJ with join key subset of partition keys: ClassCastException in
-    // KeyedPartitioning.projectKeys through Gluten's convention transition chain
-    .excludeByPrefix("SPARK-44647: test join key is subset of cluster key")
-    .exclude("SPARK-44647: test join key is the second cluster key")
-    .exclude("SPARK-44647: test join key is the second partition key and a transform")
-    .exclude("SPARK-47094: Support compatible buckets with less join keys than partition keys")
   enableSuite[GlutenLocalScanSuite]
   enableSuite[GlutenMetadataColumnSuite]
   enableSuite[GlutenSupportsCatalogOptionsSuite]
