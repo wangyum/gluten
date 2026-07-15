@@ -48,7 +48,7 @@ abstract class AbstractBatchScanExec(
       false
   }
 
-  override def hashCode(): Int = Objects.hashCode(batch, runtimeFilters)
+  override def hashCode(): Int = Objects.hashCode(batch, runtimeFilters, keyGroupedPartitioning)
 
   @transient override lazy val inputPartitions: Seq[InputPartition] = inputPartitionsShim
 
@@ -67,9 +67,16 @@ abstract class AbstractBatchScanExec(
       // SPARK-55535 changed DataSourceRDD to accept Seq[Option[InputPartition]].
       // Gluten's BatchScanExecShim.filteredPartitions returns Seq[Seq[InputPartition]].
       // Each inner Seq represents a partition slot: empty means None, single means Some(p).
+      // The inner Seq is expected to have 0 or 1 element (GroupPartitionsExec handles
+      // coalescing in Spark 4.x), so we safely take the head.
       val optionPartitions: Seq[Option[InputPartition]] = filteredPartitions.map {
         case seq if seq.isEmpty => None
-        case seq => Some(seq.head)
+        case seq =>
+          assert(
+            seq.length == 1,
+            "Expected 0 or 1 partition per slot; multi-element " +
+              "partitions should be handled by GroupPartitionsExec")
+          Some(seq.head)
       }
       new DataSourceRDD(
         sparkContext,
