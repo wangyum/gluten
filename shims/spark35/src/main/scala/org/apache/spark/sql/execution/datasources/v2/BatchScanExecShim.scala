@@ -39,6 +39,8 @@ abstract class BatchScanExecShim(
     ordering: Option[Seq[SortOrder]] = None,
     @transient val table: Table,
     val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
+    // SPJ reducers are vestigial in spark35: GroupPartitionsExec (SPARK-55535) handles
+    // coalescing, so these are never read. Kept for constructor signature compatibility.
     val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
     val applyPartialClustering: Boolean = false,
     val replicatePartitions: Boolean = false)
@@ -152,6 +154,9 @@ abstract class BatchScanExecShim(
 }
 
 abstract class ArrowBatchScanExecShim(original: BatchScanExec)
+// SPJ params (commonPartitionValues, reducers, applyPartialClustering,
+// replicatePartitions) are intentionally omitted: in spark35, GroupPartitionsExec
+// (SPARK-55535) handles SPJ coalescing, so these params are not used.
   extends BatchScanExecShim(
     original.output,
     original.scan,

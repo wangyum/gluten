@@ -63,7 +63,7 @@ class GlutenKeyGroupedPartitioningSuite
         collect(smj) {
           case s: ColumnarShuffleExchangeExec => s
           case s: ShuffleExchangeExec => s
-        })
+        }).toSet.toSeq
   }
 
   override protected def collectSMJs(plan: SparkPlan): Seq[SparkPlan] = {
@@ -1128,7 +1128,9 @@ class GlutenKeyGroupedPartitioningSuite
             !gp.enableSortedMerge,
             "hash join does not require ordering: enableSortedMerge must stay false")
           // In Gluten, the child of GroupPartitionsExec may be columnar-only, so use
-          // executeColumnar() when supportsColumnar is true.
+          // executeColumnar() when supportsColumnar is true. Calling execute()/executeColumnar()
+          // directly on a plan node is safe here because the node is part of a fully executed
+          // plan (df.collect() was called above), so children and metrics are initialized.
           val rdd = if (gp.supportsColumnar) gp.executeColumnar() else gp.execute()
           assert(
             !rdd.isInstanceOf[SortedMergeCoalescedRDD[_]],

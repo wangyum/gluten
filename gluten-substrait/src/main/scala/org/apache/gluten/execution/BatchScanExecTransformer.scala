@@ -68,7 +68,9 @@ case class BatchScanExecTransformer(
       runtimeFilters = QueryPlan.normalizePredicates(
         runtimeFilters.filterNot(_ == DynamicPruningExpression(Literal.TrueLiteral)),
         output),
-      pushDownFilters = pushDownFilters.map(QueryPlan.normalizePredicates(_, output))
+      pushDownFilters = pushDownFilters.map(QueryPlan.normalizePredicates(_, output)),
+      keyGroupedPartitioning = keyGroupedPartitioning.map(_.map(
+        QueryPlan.normalizeExpressions(_, output)))
     )
   }
 

@@ -291,15 +291,16 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         ) {
           df =>
             {
+              val plan = getExecutedPlan(df)
+              val icebergScans = plan.collect { case s: IcebergScanTransformer => s }
               assert(
-                getExecutedPlan(df).count(
-                  plan => {
-                    plan.isInstanceOf[IcebergScanTransformer]
-                  }) == 2)
-              getExecutedPlan(df).map {
-                case plan: IcebergScanTransformer =>
-                  assert(plan.getKeyGroupPartitioning.isDefined)
-                case _ => // do nothing
+                icebergScans.length == 2,
+                s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
+              icebergScans.foreach {
+                plan =>
+                  assert(
+                    plan.getKeyGroupPartitioning.isDefined,
+                    "IcebergScanTransformer should have keyGroupedPartitioning")
               }
             }
         }
@@ -370,15 +371,16 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         ) {
           df =>
             {
+              val plan = getExecutedPlan(df)
+              val icebergScans = plan.collect { case s: IcebergScanTransformer => s }
               assert(
-                getExecutedPlan(df).count(
-                  plan => {
-                    plan.isInstanceOf[IcebergScanTransformer]
-                  }) == 2)
-              getExecutedPlan(df).map {
-                case plan: IcebergScanTransformer =>
-                  assert(plan.getKeyGroupPartitioning.isDefined)
-                case _ => // do nothing
+                icebergScans.length == 2,
+                s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
+              icebergScans.foreach {
+                plan =>
+                  assert(
+                    plan.getKeyGroupPartitioning.isDefined,
+                    "IcebergScanTransformer should have keyGroupedPartitioning")
               }
             }
         }
