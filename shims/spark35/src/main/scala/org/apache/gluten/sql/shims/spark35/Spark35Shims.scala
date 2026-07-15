@@ -40,6 +40,7 @@ import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetFilters}
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, DataSourceV2ScanExecBase}
@@ -270,7 +271,20 @@ class Spark35Shims extends SparkShims {
     shuffle.advisoryPartitionSize
 
   def getFileStatus(partition: PartitionDirectory): Seq[(FileStatus, Map[String, Any])] =
-    partition.files.map(f => (f.fileStatus, f.metadata))
+    partition.files.map {
+      f =>
+        // FileStatusWithMetadata.fileStatus can be null when PartitionDirectory is created via
+        // the backward-compat constructor (Array[FileStatus]). Reconstruct from fallback fields.
+        val fs = if (f.fileStatus != null) {
+          f.fileStatus
+        } else {
+          new FileStatus(f.length, f.isDirectory, 0, 0, f.modificationTime, f.path)
+        }
+        (fs, f.metadata)
+    }
+
+  override def getCtasTableProvider(ctas: CreateDataSourceTableAsSelectCommand): Option[String] =
+    ctas.catalogTable.provider
 
   def isFileSplittable(
       relation: HadoopFsRelation,

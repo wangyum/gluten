@@ -17,13 +17,13 @@
 package org.apache.spark.sql.hive
 
 import org.apache.gluten.backendsapi.BackendsApiManager
+import org.apache.gluten.sql.shims.SparkShimLoader
 import org.apache.gluten.substrait.rel.LocalFilesNode.ReadFileFormat
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, SQLConfHelper}
 import org.apache.spark.sql.catalyst.analysis.CastSupport
 import org.apache.spark.sql.catalyst.expressions.Literal
-import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources.{FilePartition, PartitionDirectory, PartitionedFile}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.DataType
@@ -134,17 +134,18 @@ class HivePartitionConverter(hadoopConf: Configuration, session: SparkSession)
   private def getSplitFile(
       partitionDirectory: PartitionDirectory,
       maxSplitBytes: Long): Seq[PartitionedFile] =
-    partitionDirectory.files
+    SparkShimLoader.getSparkShims
+      .getFileStatus(partitionDirectory)
       .flatMap {
-        f =>
-          PartitionedFileUtil.splitFiles(
+        case (f, metadata) =>
+          SparkShimLoader.getSparkShims.splitFiles(
             session,
             f,
             f.getPath,
             isSplitable = canBeSplit(f.getPath),
             maxSplitBytes,
-            partitionDirectory.values
-          )
+            partitionDirectory.values,
+            metadata)
       }
       .sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 

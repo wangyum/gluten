@@ -23,7 +23,6 @@ import org.apache.gluten.utils.PartitionsUtil.regeneratePartition
 import org.apache.spark.Partition
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.execution.PartitionedFileUtil
 import org.apache.spark.sql.execution.datasources.{BucketingUtils, FilePartition, HadoopFsRelation, PartitionDirectory, PartitionedFile}
 import org.apache.spark.sql.execution.datasources.FilePartition.{maxSplitBytesBySpecifiedNum, minPartitionNumBySpecifiedSize}
 import org.apache.spark.sql.types.StructType
@@ -101,21 +100,21 @@ case class PartitionsUtil(
     val splitFiles = selectedPartitions
       .flatMap {
         partition =>
-          partition.files.flatMap {
+          SparkShimLoader.getSparkShims.getFileStatus(partition).flatMap {
             file =>
               // getPath() is very expensive so we only want to call it once in this block:
-              val filePath = file.getPath
+              val filePath = file._1.getPath
               if (shouldProcess(filePath)) {
                 val isSplitable =
                   relation.fileFormat.isSplitable(relation.sparkSession, relation.options, filePath)
-                PartitionedFileUtil.splitFiles(
-                  sparkSession = relation.sparkSession,
-                  file = file,
-                  filePath = filePath,
-                  isSplitable = isSplitable,
-                  maxSplitBytes = maxSplitBytes,
-                  partitionValues = partition.values
-                )
+                SparkShimLoader.getSparkShims.splitFiles(
+                  relation.sparkSession,
+                  file._1,
+                  filePath,
+                  isSplitable,
+                  maxSplitBytes,
+                  partition.values,
+                  file._2)
               } else {
                 Seq.empty
               }
