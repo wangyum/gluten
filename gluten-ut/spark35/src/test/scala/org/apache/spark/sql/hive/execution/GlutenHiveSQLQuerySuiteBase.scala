@@ -38,6 +38,18 @@ abstract class GlutenHiveSQLQuerySuiteBase extends GlutenSQLTestsTrait {
       _spark = SparkSession.builder().config(sparkConf).enableHiveSupport().getOrCreate()
     }
 
+    // Reset Hive metastore state. SlowHiveTest suites (e.g., GlutenHiveDDLSuite) that use
+    // TestHiveSingleton may leave stale tables. Use the external catalog directly to drop
+    // stale tables, bypassing the session catalog (which may have been reset by TestHive).
+    val catalog = _spark.sharedState.externalCatalog
+    try {
+      catalog.listTables("default").foreach {
+        table => catalog.dropTable("default", table, ignoreIfNotExists = true, purge = false)
+      }
+    } catch {
+      case _: Exception => // 'default' database may be missing - ignore
+    }
+
     _spark.sparkContext.setLogLevel("warn")
   }
 
