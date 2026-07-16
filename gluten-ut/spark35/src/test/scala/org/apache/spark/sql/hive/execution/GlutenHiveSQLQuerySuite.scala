@@ -129,13 +129,13 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
           val orcLoc = s"file:///$dir/test_orc_pos"
           withTable("default.test_orc_pos", "default.test_orc_pos_renamed") {
             // Write ORC files whose physical column names are c1, c2 (c1 = 1, c2 = 2).
+            // Use hiveClient.runSqlHive for DDL to ensure the table is registered in the
+            // Hive metastore, then refresh Spark's catalog to see it.
             hiveClient.runSqlHive(
               s"create table default.test_orc_pos(c1 int, c2 int) " +
                 s"stored as orc location '$orcLoc'")
-            // Use Spark SQL instead of hiveClient.runSqlHive for INSERT, because Hive's
-            // INSERT launches a MapReduce job with a separate metastore session that may
-            // not see tables created in the current session (CI environment issue when
-            // SlowHiveTest suites run before this suite and corrupt metastore state).
+            spark.sessionState.catalog.refreshTable(
+              TableIdentifier("test_orc_pos", Some("default")))
             sql("insert into default.test_orc_pos select 1, 2")
 
             // A second table over the SAME files but with mismatched column names (x, y).
@@ -143,6 +143,8 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
             hiveClient.runSqlHive(
               s"create table default.test_orc_pos_renamed(x int, y int) " +
                 s"stored as orc location '$orcLoc'")
+            spark.sessionState.catalog.refreshTable(
+              TableIdentifier("test_orc_pos_renamed", Some("default")))
 
             // orc.force.positional.evolution=true => read by position: x -> c1 (=1), y -> c2 (=2).
             withSQLConf("spark.hadoop.orc.force.positional.evolution" -> "true") {
