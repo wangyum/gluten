@@ -846,7 +846,7 @@ abstract class UpdateSuiteBase
       set: String,
       where: String,
       expectException: Boolean,
-      customErrorRegex: Option[String] = None) {
+      customErrorRegex: Option[String] = None): Unit = {
     test(s"$functionType functions in update - expect exception: $expectException") {
       withTable("deltaTable") {
         data.write.format("delta").saveAsTable("deltaTable")
@@ -855,7 +855,7 @@ abstract class UpdateSuiteBase
 
         def checkExpression(
             setOption: Option[String] = None,
-            whereOption: Option[String] = None) {
+            whereOption: Option[String] = None): Unit = {
           var catchException = if (functionType.equals("Generate")) {
             expectException
           } else true
