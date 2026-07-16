@@ -129,22 +129,17 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
           val orcLoc = s"file:///$dir/test_orc_pos"
           withTable("default.test_orc_pos", "default.test_orc_pos_renamed") {
             // Write ORC files whose physical column names are c1, c2 (c1 = 1, c2 = 2).
-            // Use hiveClient.runSqlHive for DDL to ensure the table is registered in the
-            // Hive metastore, then refresh Spark's catalog to see it.
-            hiveClient.runSqlHive(
-              s"create table default.test_orc_pos(c1 int, c2 int) " +
-                s"stored as orc location '$orcLoc'")
-            spark.sessionState.catalog.refreshTable(
-              TableIdentifier("test_orc_pos", Some("default")))
-            sql("insert into default.test_orc_pos select 1, 2")
+            // Use Spark SQL for DDL/DML to avoid Hive metastore session sync issues in CI.
+            sql(
+              s"CREATE TABLE default.test_orc_pos(c1 int, c2 int) " +
+                s"USING hive OPTIONS(fileFormat 'orc') LOCATION '$orcLoc'")
+            sql("INSERT INTO default.test_orc_pos SELECT 1, 2")
 
             // A second table over the SAME files but with mismatched column names (x, y).
             // By name, x/y are not present in the files; only position mapping can read them.
-            hiveClient.runSqlHive(
-              s"create table default.test_orc_pos_renamed(x int, y int) " +
-                s"stored as orc location '$orcLoc'")
-            spark.sessionState.catalog.refreshTable(
-              TableIdentifier("test_orc_pos_renamed", Some("default")))
+            sql(
+              s"CREATE TABLE default.test_orc_pos_renamed(x int, y int) " +
+                s"USING hive OPTIONS(fileFormat 'orc') LOCATION '$orcLoc'")
 
             // orc.force.positional.evolution=true => read by position: x -> c1 (=1), y -> c2 (=2).
             withSQLConf("spark.hadoop.orc.force.positional.evolution" -> "true") {
