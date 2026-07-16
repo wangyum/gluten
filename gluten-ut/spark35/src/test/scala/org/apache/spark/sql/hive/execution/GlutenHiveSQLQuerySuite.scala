@@ -132,7 +132,11 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
             hiveClient.runSqlHive(
               s"create table default.test_orc_pos(c1 int, c2 int) " +
                 s"stored as orc location '$orcLoc'")
-            hiveClient.runSqlHive("insert into default.test_orc_pos select 1, 2")
+            // Use Spark SQL instead of hiveClient.runSqlHive for INSERT, because Hive's
+            // INSERT launches a MapReduce job with a separate metastore session that may
+            // not see tables created in the current session (CI environment issue when
+            // SlowHiveTest suites run before this suite and corrupt metastore state).
+            sql("insert into default.test_orc_pos select 1, 2")
 
             // A second table over the SAME files but with mismatched column names (x, y).
             // By name, x/y are not present in the files; only position mapping can read them.
