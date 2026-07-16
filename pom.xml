@@ -1247,8 +1247,8 @@
         <iceberg.version>1.10.1.0.0.8</iceberg.version>
         <celeborn.version>0.6.1.0.1.0</celeborn.version>
         <delta.package.name>delta-spark</delta.package.name>
-        <delta.version>3.0.0-ebay.20260409</delta.version>
-        <delta.binary.version>24</delta.binary.version>
+        <delta.version>3.3.3-ebay.20260715</delta.version>
+        <delta.binary.version>33</delta.binary.version>
         <hudi.version>0.15.0</hudi.version>
         <fasterxml.version>2.15.1</fasterxml.version>
         <hadoop.version>3.3.3.2.0.11</hadoop.version>

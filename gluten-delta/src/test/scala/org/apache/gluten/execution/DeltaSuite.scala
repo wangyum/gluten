@@ -412,7 +412,6 @@ abstract class DeltaSuite extends WholeStageTransformerSuite {
   }
 
   testWithMinSparkVersion("deletion vector", "3.4") {
-    assume(false, "ignored")
     withTempPath {
       p =>
         import testImplicits._

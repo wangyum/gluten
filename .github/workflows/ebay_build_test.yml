@@ -208,7 +208,6 @@ jobs:
             apt-get update && apt-get install -y openjdk-8-jdk wget
             apt remove openjdk-11* -y
           fi
-          ls -l /root/.m2/repository/org/apache/arrow/arrow-dataset/15.0.0-gluten/
       - name: Install Hadoop & Setup HDFS
         if: matrix.os == 'ubuntu:22.04' && matrix.spark == 'spark-3.5' && matrix.java == 'java-8'
         shell: bash
@@ -327,7 +326,6 @@ jobs:
           path: /tmp/tpch-approved-plan/**
 
   spark-test-spark35-scala213:
-    if: ${{ contains(github.event.head_commit.message, '[scala-2.13]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
     container: apache/gluten:centos-8-jdk8
