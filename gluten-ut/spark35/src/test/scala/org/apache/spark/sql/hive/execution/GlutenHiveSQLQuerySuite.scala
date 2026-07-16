@@ -127,20 +127,22 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
       withTempDir {
         dir =>
           val orcLoc = s"file:///$dir/test_orc_pos"
-          withTable("test_orc_pos", "test_orc_pos_renamed") {
+          withTable("default.test_orc_pos", "default.test_orc_pos_renamed") {
             // Write ORC files whose physical column names are c1, c2 (c1 = 1, c2 = 2).
             hiveClient.runSqlHive(
-              s"create table test_orc_pos(c1 int, c2 int) stored as orc location '$orcLoc'")
-            hiveClient.runSqlHive("insert into test_orc_pos select 1, 2")
+              s"create table default.test_orc_pos(c1 int, c2 int) " +
+                s"stored as orc location '$orcLoc'")
+            hiveClient.runSqlHive("insert into default.test_orc_pos select 1, 2")
 
             // A second table over the SAME files but with mismatched column names (x, y).
             // By name, x/y are not present in the files; only position mapping can read them.
             hiveClient.runSqlHive(
-              s"create table test_orc_pos_renamed(x int, y int) stored as orc location '$orcLoc'")
+              s"create table default.test_orc_pos_renamed(x int, y int) " +
+                s"stored as orc location '$orcLoc'")
 
             // orc.force.positional.evolution=true => read by position: x -> c1 (=1), y -> c2 (=2).
             withSQLConf("spark.hadoop.orc.force.positional.evolution" -> "true") {
-              val df = sql("select x, y from test_orc_pos_renamed")
+              val df = sql("select x, y from default.test_orc_pos_renamed")
               checkAnswer(df, Seq(Row(1, 2)))
               checkOperatorMatch[HiveTableScanExecTransformer](df)
             }
