@@ -27,27 +27,31 @@ import org.apache.spark.sql.catalyst.optimizer.ConvertToLocalRelation
 import org.apache.spark.sql.hive.HiveUtils
 import org.apache.spark.sql.internal.SQLConf
 
+import org.apache.commons.io.FileUtils
+
+import java.io.File
+
 import scala.reflect.ClassTag
 
+/**
+ * Base trait for Gluten Hive SQL test suites that need a separate SparkSession with Hive support
+ * and a dedicated Derby metastore.
+ */
 abstract class GlutenHiveSQLQuerySuiteBase extends GlutenSQLTestsTrait {
   private var _spark: SparkSession = null
 
   override def beforeAll(): Unit = {
     prepareWorkDir()
+    // Clean warehouse and metastore from previous runs
+    val warehouseDir = new File(
+      getClass.getResource("/").getPath + "tests-working-home")
+    if (warehouseDir.exists()) FileUtils.forceDelete(warehouseDir)
+    val metastoreDir = new File(
+      getClass.getResource("/").getPath + getClass.getCanonicalName)
+    if (metastoreDir.exists()) FileUtils.forceDelete(metastoreDir)
+
     if (_spark == null) {
       _spark = SparkSession.builder().config(sparkConf).enableHiveSupport().getOrCreate()
-    }
-
-    // Reset Hive metastore state. SlowHiveTest suites (e.g., GlutenHiveDDLSuite) that use
-    // TestHiveSingleton may leave stale tables. Use the external catalog directly to drop
-    // stale tables, bypassing the session catalog (which may have been reset by TestHive).
-    val catalog = _spark.sharedState.externalCatalog
-    try {
-      catalog.listTables("default").foreach {
-        table => catalog.dropTable("default", table, ignoreIfNotExists = true, purge = false)
-      }
-    } catch {
-      case _: Exception => // 'default' database may be missing - ignore
     }
 
     _spark.sparkContext.setLogLevel("warn")
@@ -59,16 +63,12 @@ abstract class GlutenHiveSQLQuerySuiteBase extends GlutenSQLTestsTrait {
     try {
       super.afterAll()
       if (_spark != null) {
-        try {
-          _spark.sessionState.catalog.reset()
-        } finally {
-          _spark.stop()
-          _spark = null
-        }
+        _spark.sessionState.catalog.reset()
       }
     } finally {
       SparkSession.clearActiveSession()
       SparkSession.clearDefaultSession()
+      _spark = null
       doThreadPostAudit()
     }
   }
@@ -97,7 +97,7 @@ abstract class GlutenHiveSQLQuerySuiteBase extends GlutenSQLTestsTrait {
 
     conf.set(
       "spark.sql.warehouse.dir",
-      getClass.getResource("/").getPath + "/tests-working-home/spark-warehouse")
+      getClass.getResource("/").getPath + "tests-working-home/spark-warehouse")
     val metastore = getClass.getResource("/").getPath + getClass.getCanonicalName + "/metastore_db"
     conf.set("javax.jdo.option.ConnectionURL", s"jdbc:derby:;databaseName=$metastore;create=true")
   }
