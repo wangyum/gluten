@@ -328,6 +328,8 @@ jobs:
   spark-test-spark35-scala213:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
+    env:
+      SPARK_TESTING: true
     container: apache/gluten:centos-8-jdk8
     steps:
       - uses: actions/checkout@v4
