@@ -158,20 +158,19 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
           val parquetLoc = s"file:///$dir/test_parquet"
           val orcLoc = s"file:///$dir/test_orc"
           withTable("test_parquet", "test_orc") {
-            sql(s"""CREATE TABLE test_parquet(id int)
-                 USING hive OPTIONS(fileFormat 'parquet')
-                 PARTITIONED BY(pid int)
-                 LOCATION '$parquetLoc'""")
-            sql("INSERT INTO test_parquet PARTITION(pid=1) SELECT 2")
-            sql(s"""CREATE TABLE test_orc(id int)
-                 USING hive OPTIONS(fileFormat 'orc')
-                 PARTITIONED BY(pid int)
-                 LOCATION '$orcLoc'""")
-            sql("INSERT INTO test_orc PARTITION(pid=2) SELECT 2")
-            sql(s"ALTER TABLE test_parquet ADD PARTITION (pid=2) LOCATION '$orcLoc/pid=2'")
-            // ALTER TABLE SET FILEFORMAT is Hive-specific DDL not supported by Spark SQL.
-            hiveClient.runSqlHive("ALTER TABLE test_parquet PARTITION(pid=2) SET FILEFORMAT orc")
-            spark.sessionState.catalog.refreshTable(TableIdentifier("test_parquet"))
+            hiveClient.runSqlHive(s"""create table test_parquet(id int)
+                 partitioned by(pid int)
+                 stored as parquet location '$parquetLoc'
+                 """.stripMargin)
+            hiveClient.runSqlHive("insert into test_parquet partition(pid=1) select 2")
+            hiveClient.runSqlHive(s"""create table test_orc(id int)
+                 partitioned by(pid int)
+                 stored as orc location '$orcLoc'
+                 """.stripMargin)
+            hiveClient.runSqlHive("insert into test_orc partition(pid=2) select 2")
+            hiveClient.runSqlHive(
+              s"alter table test_parquet add partition (pid=2) location '$orcLoc/pid=2'")
+            hiveClient.runSqlHive("alter table test_parquet partition(pid=2) SET FILEFORMAT orc")
             val df = sql("select pid, id from test_parquet order by pid")
             checkAnswer(df, Seq(Row(1, 2), Row(2, 2)))
             checkOperatorMatch[HiveTableScanExecTransformer](df)
