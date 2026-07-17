@@ -175,10 +175,6 @@
       -Djdk.reflect.useDirectMethodHandle=false
       -Dio.netty.tryReflectionSetAccessible=true
       -Dfile.encoding=UTF-8
-      -Dspark.plugins=org.apache.gluten.GlutenPlugin
-      -Dspark.memory.offHeap.enabled=true
-      -Dspark.memory.offHeap.size=1024MB
-      -Dspark.shuffle.manager=org.apache.spark.shuffle.sort.ColumnarShuffleManager
     </extraJavaTestArgs>
     <log4j.conf>file:src/test/resources/log4j2.properties</log4j.conf>
   </properties>
