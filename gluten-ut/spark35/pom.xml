@@ -28,36 +28,6 @@
   <packaging>jar</packaging>
   <name>Gluten Unit Test Spark35</name>
 
-  <properties>
-    <!-- Override extraJavaTestArgs to include Gluten system properties as JVM args.
-         This ensures spark.plugins is set before any test class is loaded, which is
-         required because TestHiveSingleton's val spark = TestHive.sparkSession eagerly
-         creates the SparkContext during class construction, BEFORE beforeAll() runs.
-         Scoped to spark35 only to avoid breaking gluten-ut/test module. -->
-    <extraJavaTestArgs>-XX:+IgnoreUnrecognizedVMOptions
-      --add-opens=java.base/java.lang=ALL-UNNAMED
-      --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
-      --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
-      --add-opens=java.base/java.io=ALL-UNNAMED
-      --add-opens=java.base/java.net=ALL-UNNAMED
-      --add-opens=java.base/java.nio=ALL-UNNAMED
-      --add-opens=java.base/java.util=ALL-UNNAMED
-      --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
-      --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
-      --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED
-      --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
-      --add-opens=java.base/sun.nio.cs=ALL-UNNAMED
-      --add-opens=java.base/sun.security.action=ALL-UNNAMED
-      --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
-      -Djdk.reflect.useDirectMethodHandle=false
-      -Dio.netty.tryReflectionSetAccessible=true
-      -Dfile.encoding=UTF-8
-      -Dspark.plugins=org.apache.gluten.GlutenPlugin
-      -Dspark.memory.offHeap.enabled=true
-      -Dspark.memory.offHeap.size=1024MB
-      -Dspark.shuffle.manager=org.apache.spark.shuffle.sort.ColumnarShuffleManager</extraJavaTestArgs>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.gluten</groupId>

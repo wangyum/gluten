@@ -40,8 +40,9 @@ trait GlutenTestSetWithSystemPropertyTrait extends GlutenTestsCommonTrait {
 
   override def afterAll(): Unit = {
     super.afterAll()
-    // Do not clear system properties here. They may be needed by other suites that share
-    // the same SparkContext (e.g., SlowHiveTest suites using TestHiveSingleton). The
-    // properties are set once and remain for the lifetime of the JVM.
+    System.clearProperty("spark.plugins")
+    System.clearProperty("spark.memory.offHeap.enabled")
+    System.clearProperty("spark.memory.offHeap.size")
+    System.clearProperty("spark.shuffle.manager")
   }
 }
