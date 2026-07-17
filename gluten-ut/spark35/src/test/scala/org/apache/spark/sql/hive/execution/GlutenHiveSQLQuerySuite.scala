@@ -155,13 +155,13 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
           val orcLoc = s"file:///$dir/test_orc"
           withTable("test_parquet", "test_orc") {
             sql(s"""CREATE TABLE test_parquet(id int)
-                 PARTITIONED BY(pid int)
                  USING hive OPTIONS(fileFormat 'parquet')
+                 PARTITIONED BY(pid int)
                  LOCATION '$parquetLoc'""")
             sql("INSERT INTO test_parquet PARTITION(pid=1) SELECT 2")
             sql(s"""CREATE TABLE test_orc(id int)
-                 PARTITIONED BY(pid int)
                  USING hive OPTIONS(fileFormat 'orc')
+                 PARTITIONED BY(pid int)
                  LOCATION '$orcLoc'""")
             sql("INSERT INTO test_orc PARTITION(pid=2) SELECT 2")
             sql(s"ALTER TABLE test_parquet ADD PARTITION (pid=2) LOCATION '$orcLoc/pid=2'")
