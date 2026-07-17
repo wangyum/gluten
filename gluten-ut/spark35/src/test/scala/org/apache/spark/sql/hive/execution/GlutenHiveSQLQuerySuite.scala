@@ -24,6 +24,7 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveTableScanExecTransformer}
+import org.apache.spark.sql.hive.client.HiveClient
 
 import scala.collection.immutable.Seq
 
@@ -119,12 +120,16 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
   }
 
   testGluten("orc.force.positional.evolution maps Hive ORC columns by position") {
+    val hiveClient: HiveClient =
+      spark.sharedState.externalCatalog.unwrapped.asInstanceOf[HiveExternalCatalog].client
+
     withSQLConf("spark.sql.hive.convertMetastoreOrc" -> "false") {
       withTempDir {
         dir =>
           val orcLoc = s"file:///$dir/test_orc_pos"
           withTable("default.test_orc_pos", "default.test_orc_pos_renamed") {
             // Write ORC files whose physical column names are c1, c2 (c1 = 1, c2 = 2).
+            // Use Spark SQL for DDL/DML to avoid Hive metastore session sync issues in CI.
             sql(
               s"CREATE TABLE default.test_orc_pos(c1 int, c2 int) " +
                 s"USING hive OPTIONS(fileFormat 'orc') LOCATION '$orcLoc'")
@@ -148,7 +153,7 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
   }
 
   test("GLUTEN-11062: Supports mixed input format for partitioned Hive table") {
-    val hiveClient =
+    val hiveClient: HiveClient =
       spark.sharedState.externalCatalog.unwrapped.asInstanceOf[HiveExternalCatalog].client
 
     withSQLConf("spark.sql.hive.convertMetastoreParquet" -> "false") {
@@ -157,20 +162,19 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
           val parquetLoc = s"file:///$dir/test_parquet"
           val orcLoc = s"file:///$dir/test_orc"
           withTable("test_parquet", "test_orc") {
-            sql(s"""CREATE TABLE test_parquet(id int)
-                 PARTITIONED BY(pid int)
-                 STORED AS PARQUET
-                 LOCATION '$parquetLoc'""")
-            sql("INSERT INTO test_parquet PARTITION(pid=1) SELECT 2")
-            sql(s"""CREATE TABLE test_orc(id int)
-                 PARTITIONED BY(pid int)
-                 STORED AS ORC
-                 LOCATION '$orcLoc'""")
-            sql("INSERT INTO test_orc PARTITION(pid=2) SELECT 2")
+            hiveClient.runSqlHive(s"""create table test_parquet(id int)
+                 partitioned by(pid int)
+                 stored as parquet location '$parquetLoc'
+                 """.stripMargin)
+            hiveClient.runSqlHive("insert into test_parquet partition(pid=1) select 2")
+            hiveClient.runSqlHive(s"""create table test_orc(id int)
+                 partitioned by(pid int)
+                 stored as orc location '$orcLoc'
+                 """.stripMargin)
+            hiveClient.runSqlHive("insert into test_orc partition(pid=2) select 2")
             hiveClient.runSqlHive(
               s"alter table test_parquet add partition (pid=2) location '$orcLoc/pid=2'")
-            hiveClient.runSqlHive(
-              "alter table test_parquet partition(pid=2) SET FILEFORMAT orc")
+            hiveClient.runSqlHive("alter table test_parquet partition(pid=2) SET FILEFORMAT orc")
             val df = sql("select pid, id from test_parquet order by pid")
             checkAnswer(df, Seq(Row(1, 2), Row(2, 2)))
             checkOperatorMatch[HiveTableScanExecTransformer](df)
