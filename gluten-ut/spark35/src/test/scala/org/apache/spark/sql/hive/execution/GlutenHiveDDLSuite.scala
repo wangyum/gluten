@@ -21,22 +21,7 @@ import org.apache.spark.tags.SlowHiveTest
 
 @SlowHiveTest
 class GlutenHiveDDLSuite
-  extends {
-    // Early initializer: runs before TestHiveSingleton's val spark = TestHive.sparkSession
-    // initializes, which eagerly creates the SparkContext. Without this, GlutenPlugin is
-    // never loaded because GlutenTestSetWithSystemPropertyTrait.beforeAll() runs too late.
-    private val _ensureGlutenSystemProperties: Unit = {
-      if (!System.getProperty("spark.plugins", "").contains("GlutenPlugin")) {
-        System.setProperty("spark.plugins", "org.apache.gluten.GlutenPlugin")
-        System.setProperty("spark.memory.offHeap.enabled", "true")
-        System.setProperty("spark.memory.offHeap.size", "1024MB")
-        System.setProperty(
-          "spark.shuffle.manager",
-          "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
-      }
-    }
-  }
-  with HiveDDLSuite
+  extends HiveDDLSuite
   with GlutenTestSetWithSystemPropertyTrait
   with GlutenHiveResourcePathSupport {
 
