@@ -23,7 +23,8 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.hive.HiveTableScanExecTransformer
+import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveTableScanExecTransformer}
+import org.apache.spark.sql.hive.client.HiveClient
 
 import scala.collection.immutable.Seq
 
@@ -148,6 +149,9 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
   }
 
   test("GLUTEN-11062: Supports mixed input format for partitioned Hive table") {
+    val hiveClient: HiveClient =
+      spark.sharedState.externalCatalog.unwrapped.asInstanceOf[HiveExternalCatalog].client
+
     withSQLConf("spark.sql.hive.convertMetastoreParquet" -> "false") {
       withTempDir {
         dir =>
@@ -165,7 +169,9 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
                  LOCATION '$orcLoc'""")
             sql("INSERT INTO test_orc PARTITION(pid=2) SELECT 2")
             sql(s"ALTER TABLE test_parquet ADD PARTITION (pid=2) LOCATION '$orcLoc/pid=2'")
-            sql("ALTER TABLE test_parquet PARTITION(pid=2) SET FILEFORMAT orc")
+            // ALTER TABLE SET FILEFORMAT is Hive-specific DDL not supported by Spark SQL.
+            hiveClient.runSqlHive("ALTER TABLE test_parquet PARTITION(pid=2) SET FILEFORMAT orc")
+            spark.sessionState.catalog.refreshTable(TableIdentifier("test_parquet"))
             val df = sql("select pid, id from test_parquet order by pid")
             checkAnswer(df, Seq(Row(1, 2), Row(2, 2)))
             checkOperatorMatch[HiveTableScanExecTransformer](df)
