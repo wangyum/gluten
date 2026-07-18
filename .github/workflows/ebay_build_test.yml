@@ -657,7 +657,7 @@ jobs:
             export SCALA_VERSION=2.12.18
           fi
           $MVN_CMD clean install -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
-          $MVN_CMD -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          $MVN_CMD -s ./.github/settings.xml deploy -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true -Dmaven.deploy.skip=true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload bundle package for Scala ${{ matrix.scala_version }}
