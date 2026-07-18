@@ -23,8 +23,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.hive.{HiveExternalCatalog, HiveTableScanExecTransformer}
-import org.apache.spark.sql.hive.client.HiveClient
+import org.apache.spark.sql.hive.HiveTableScanExecTransformer
 
 import scala.collection.immutable.Seq
 
