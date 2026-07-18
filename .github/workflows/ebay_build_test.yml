@@ -555,7 +555,7 @@ jobs:
           yum install -y java-17-openjdk-devel wget
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
-          wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
+          wget https://archive.apache.org/dist/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
           tar -xvf apache-maven-3.8.9-bin.tar.gz
           mv apache-maven-3.8.9 /usr/lib/maven
       - name: Build for Spark ${{ matrix.spark }}
@@ -632,7 +632,7 @@ jobs:
           yum install -y java-17-openjdk-devel wget
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
-          wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
+          wget https://archive.apache.org/dist/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
           tar -xvf apache-maven-3.8.9-bin.tar.gz
           mv apache-maven-3.8.9 /usr/lib/maven
       - name: Build and Deploy Bundle Package for Scala ${{ matrix.scala_version }}
