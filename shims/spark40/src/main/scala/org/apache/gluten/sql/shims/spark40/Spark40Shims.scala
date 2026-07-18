@@ -43,6 +43,7 @@ import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, Sca
 import org.apache.spark.sql.connector.read.streaming.SparkDataStream
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetFilters}
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, BatchScanExecShim, DataSourceV2ScanExecBase}
@@ -276,6 +277,9 @@ class Spark40Shims extends SparkShims {
 
   def getFileStatus(partition: PartitionDirectory): Seq[(FileStatus, Map[String, Any])] =
     partition.files.map(f => (f.fileStatus, f.metadata))
+
+  def getCtasTableProvider(ctas: CreateDataSourceTableAsSelectCommand): Option[String] =
+    ctas.table.provider
 
   def isFileSplittable(
       relation: HadoopFsRelation,
