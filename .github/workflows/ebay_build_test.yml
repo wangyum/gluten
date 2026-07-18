@@ -605,7 +605,6 @@ jobs:
             --off-heap-size=10g -s=1.0 --threads=8 --iterations=1
 
   build-and-deploy-bundle-package-centos8:
-    if: ${{ contains(github.ref, 'release') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     strategy:
       matrix:
