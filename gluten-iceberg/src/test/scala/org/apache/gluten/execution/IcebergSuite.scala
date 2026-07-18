@@ -281,11 +281,14 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "false"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin, noFallBack = false) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
               val plan = getExecutedPlan(df)
@@ -293,9 +296,7 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               assert(
                 icebergScans.length == 2,
                 s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
-              icebergScans.foreach { plan =>
-                assert(plan.getKeyGroupPartitioning.isDefined)
-              }
+              icebergScans.foreach(plan => assert(plan.getKeyGroupPartitioning.isDefined))
             }
         }
       }
@@ -355,11 +356,14 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "true"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin, noFallBack = false) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
               val plan = getExecutedPlan(df)
@@ -367,9 +371,7 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
               assert(
                 icebergScans.length == 2,
                 s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
-              icebergScans.foreach { plan =>
-                assert(plan.getKeyGroupPartitioning.isDefined)
-              }
+              icebergScans.foreach(plan => assert(plan.getKeyGroupPartitioning.isDefined))
             }
         }
       }
