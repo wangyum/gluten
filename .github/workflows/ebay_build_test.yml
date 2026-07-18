@@ -527,7 +527,6 @@ jobs:
             **/gluten-ut/**/core.*
 
   tpc-test-ubuntu-2204-celeborn:
-    if: ${{ contains(github.event.head_commit.message, '[celeborn]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     strategy:
       fail-fast: false
