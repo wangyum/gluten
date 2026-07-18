@@ -317,8 +317,9 @@ abstract class UpdateSuiteBase
   }
 
   for (storeAssignmentPolicy <- StoreAssignmentPolicy.values)
-    test("upcast int source type into long target, storeAssignmentPolicy = " +
-      s"$storeAssignmentPolicy") {
+    test(
+      "upcast int source type into long target, storeAssignmentPolicy = " +
+        s"$storeAssignmentPolicy") {
       append(Seq((99, 2L), (100, 4L), (101, 3L)).toDF("key", "value"))
       withSQLConf(
         SQLConf.STORE_ASSIGNMENT_POLICY.key -> storeAssignmentPolicy.toString,
@@ -334,8 +335,9 @@ abstract class UpdateSuiteBase
   // storeAssignmentPolicy is LEGACY or ANSI. STRICT is tested in [[UpdateSQLSuite]] only due to
   // limitations when using the Scala API.
   for (storeAssignmentPolicy <- StoreAssignmentPolicy.values - StoreAssignmentPolicy.STRICT)
-    test("invalid implicit cast string source type into boolean target, " +
-      s"storeAssignmentPolicy = $storeAssignmentPolicy") {
+    test(
+      "invalid implicit cast string source type into boolean target, " +
+        s"storeAssignmentPolicy = $storeAssignmentPolicy") {
       append(Seq((99, true), (100, false), (101, true)).toDF("key", "value"))
       withSQLConf(
         SQLConf.STORE_ASSIGNMENT_POLICY.key -> storeAssignmentPolicy.toString,
@@ -351,8 +353,9 @@ abstract class UpdateSuiteBase
   // storeAssignmentPolicy is LEGACY or ANSI. STRICT is tested in [[UpdateSQLSuite]] only due to
   // limitations when using the Scala API.
   for (storeAssignmentPolicy <- StoreAssignmentPolicy.values - StoreAssignmentPolicy.STRICT)
-    test("valid implicit cast string source type into int target, " +
-      s"storeAssignmentPolicy = $storeAssignmentPolicy") {
+    test(
+      "valid implicit cast string source type into int target, " +
+        s"storeAssignmentPolicy = $storeAssignmentPolicy") {
       append(Seq((99, 2), (100, 4), (101, 3)).toDF("key", "value"))
       withSQLConf(
         SQLConf.STORE_ASSIGNMENT_POLICY.key -> storeAssignmentPolicy.toString,
@@ -365,8 +368,7 @@ abstract class UpdateSuiteBase
     }
 
   test("update cached table") {
-    Seq((2, 2), (1, 4)).toDF("key", "value")
-      .write.mode("overwrite").format("delta").save(tempPath)
+    Seq((2, 2), (1, 4)).toDF("key", "value").write.mode("overwrite").format("delta").save(tempPath)
 
     spark.read.format("delta").load(tempPath).cache()
     spark.read.format("delta").load(tempPath).collect()
@@ -411,10 +413,17 @@ abstract class UpdateSuiteBase
 
   test("target columns can have db and table qualifiers") {
     withTable("target") {
-      spark.read.json("""
+      spark.read
+        .json(
+          """
           {"a": {"b.1": 1, "c.e": 'random'}, "d": 1}
           {"a": {"b.1": 3, "c.e": 'string'}, "d": 2}"""
-        .split("\\n").toSeq.toDS()).write.format("delta").saveAsTable("`target`")
+            .split("\n")
+            .toSeq
+            .toDS())
+        .write
+        .format("delta")
+        .saveAsTable("`target`")
 
       executeUpdate(
         target = "target",
@@ -423,23 +432,31 @@ abstract class UpdateSuiteBase
 
       checkAnswer(
         spark.table("target"),
-        spark.read.json("""
+        spark.read.json(
+          """
             {"a": {"b.1": -1, "c.e": 'RANDOM'}, "d": 1}
             {"a": {"b.1": 3, "c.e": 'string'}, "d": 2}"""
-          .split("\\n").toSeq.toDS())
+            .split("\n")
+            .toSeq
+            .toDS())
       )
     }
   }
 
   test("Negative case - non-delta target") {
-    Seq((1, 1), (0, 3), (1, 5)).toDF("key1", "value")
-      .write.mode("overwrite").format("parquet").save(tempPath)
+    Seq((1, 1), (0, 3), (1, 5))
+      .toDF("key1", "value")
+      .write
+      .mode("overwrite")
+      .format("parquet")
+      .save(tempPath)
     val e = intercept[DeltaAnalysisException] {
       executeUpdate(target = s"delta.`$tempPath`", set = "key1 = 3")
     }.getMessage
-    assert(e.contains("UPDATE destination only supports Delta sources") ||
-      e.contains("is not a Delta table") || e.contains("doesn't exist") ||
-      e.contains("Incompatible format"))
+    assert(
+      e.contains("UPDATE destination only supports Delta sources") ||
+        e.contains("is not a Delta table") || e.contains("doesn't exist") ||
+        e.contains("Incompatible format"))
   }
 
   test("Negative case - check target columns during analysis") {
@@ -449,8 +466,9 @@ abstract class UpdateSuiteBase
         executeUpdate("table", set = "column_doesnt_exist = 'San Francisco'", where = "t = 'a'")
       }
       // The error class is renamed from MISSING_COLUMN to UNRESOLVED_COLUMN in Spark 3.4
-      assert(ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
-        || ae.getErrorClass == "MISSING_COLUMN")
+      assert(
+        ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+          || ae.getErrorClass == "MISSING_COLUMN")
 
       withSQLConf(SQLConf.CASE_SENSITIVE.key -> "false") {
         executeUpdate(target = "table", set = "S = 1, T = 'b'", where = "T = 'a'")
@@ -465,23 +483,26 @@ abstract class UpdateSuiteBase
           executeUpdate(target = "table", set = "S = 1", where = "t = 'a'")
         }
         // The error class is renamed from MISSING_COLUMN to UNRESOLVED_COLUMN in Spark 3.4
-        assert(ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
-          || ae.getErrorClass == "MISSING_COLUMN")
+        assert(
+          ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+            || ae.getErrorClass == "MISSING_COLUMN")
 
         ae = intercept[AnalysisException] {
           executeUpdate(target = "table", set = "S = 1, s = 'b'", where = "s = 1")
         }
         // The error class is renamed from MISSING_COLUMN to UNRESOLVED_COLUMN in Spark 3.4
-        assert(ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
-          || ae.getErrorClass == "MISSING_COLUMN")
+        assert(
+          ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+            || ae.getErrorClass == "MISSING_COLUMN")
 
         // unresolved column in condition
         ae = intercept[AnalysisException] {
           executeUpdate(target = "table", set = "s = 1", where = "T = 'a'")
         }
         // The error class is renamed from MISSING_COLUMN to UNRESOLVED_COLUMN in Spark 3.4
-        assert(ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
-          || ae.getErrorClass == "MISSING_COLUMN")
+        assert(
+          ae.getErrorClass == "UNRESOLVED_COLUMN.WITH_SUGGESTION"
+            || ae.getErrorClass == "MISSING_COLUMN")
       }
     }
   }
@@ -714,15 +735,13 @@ abstract class UpdateSuiteBase
 
       val e = intercept[AnalysisException] {
         checkUpdateJson(
-          target =
-            """
+          target = """
           {"a": {"c": {"d": 'RANDOM', "e": 'str'}, "g": 1}, "z": 10}
           {"a": {"c": {"d": 'random2', "e": 'str2'}, "g": 2}, "z": 20}""",
           updateWhere = "a.g = 2",
           set =
             "a = named_struct('g', 20, 'c', named_struct('e', 'str0', 'd', 'randomNew'))" :: Nil,
-          expected =
-            """
+          expected = """
           {"a": {"c": {"d": 'RANDOM', "e": 'str'}, "g": 1}, "z": 10}
           {"a": {"c": {"d": 'randomNew', "e": 'str0'}, "g": 20}, "z": 20}"""
         )
@@ -733,10 +752,13 @@ abstract class UpdateSuiteBase
   }
 
   testQuietly("nested data - negative case") {
-    val targetDF = spark.read.json("""
+    val targetDF = spark.read.json(
+      """
         {"a": {"c": {"d": 'random', "e": 'str'}, "g": 1}, "z": 10}
         {"a": {"c": {"d": 'random2', "e": 'str2'}, "g": 2}, "z": 20}"""
-      .split("\\n").toSeq.toDS())
+        .split("\n")
+        .toSeq
+        .toDS())
 
     testAnalysisException(
       targetDF,
@@ -789,21 +811,22 @@ abstract class UpdateSuiteBase
         expectedResults = Row(1, 3) :: Row(1, 4) :: Row(1, 1) :: Row(0, 3) :: Nil)
     }
 
-    val scans = executedPlans.flatMap(_.collect {
-      case f: FileSourceScanExec => f
-    })
+    val scans = executedPlans.flatMap(_.collect { case f: FileSourceScanExec => f })
     // The first scan is for finding files to update. We only are matching against the key
     // so that should be the only field in the schema.
-    assert(scans.head.schema == StructType(
-      Seq(
-        StructField("key", IntegerType)
-      )
-    ))
+    assert(
+      scans.head.schema == StructType(
+        Seq(
+          StructField("key", IntegerType)
+        )
+      ))
   }
 
   test("nested schema pruning on finding files to update") {
-    append(Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("key", "value")
-      .select(struct("key", "value").alias("nested")))
+    append(
+      Seq((2, 2), (1, 4), (1, 1), (0, 3))
+        .toDF("key", "value")
+        .select(struct("key", "value").alias("nested")))
     // Start from a cached snapshot state
     deltaLog.update().stateDF
 
@@ -816,9 +839,7 @@ abstract class UpdateSuiteBase
       )
     }
 
-    val scans = executedPlans.flatMap(_.collect {
-      case f: FileSourceScanExec => f
-    })
+    val scans = executedPlans.flatMap(_.collect { case f: FileSourceScanExec => f })
 
     assert(scans.head.schema == StructType.fromDDL("nested STRUCT<key: int>"))
   }
@@ -929,8 +950,7 @@ abstract class UpdateSuiteBase
     set = "b = (select explode(c) from deltaTable)",
     where = "b = (select explode(c) from deltaTable)",
     expectException = true, // more than one generated, expect exception.
-    customErrorRegex =
-      Some(".*ore than one row returned by a subquery used as an expression(?s).*")
+    customErrorRegex = Some(".*ore than one row returned by a subquery used as an expression(?s).*")
   )
 
   protected def checkUpdateJson(
@@ -1024,7 +1044,7 @@ abstract class UpdateSuiteBase
     expectedErrorClassForDataSetTempView = "UNRESOLVED_COLUMN.WITH_SUGGESTION"
   )
 
-  // Ignore in Gluten: Error message mismatch.
+// Ignore in Gluten: Error message mismatch.
 //  testInvalidTempViews("superset cols")(
 //    text = "SELECT key, value, 1 FROM tab",
 //    // The analyzer can't tell whether the table originally had the extra column or not.
@@ -1048,7 +1068,7 @@ abstract class UpdateSuiteBase
     }
   }
 
-  // Ignore in Gluten - result mismatch, but Gluten's answer is correct.
+// Ignore in Gluten - result mismatch, but Gluten's answer is correct.
 //  testComplexTempViews("nontrivial projection")(
 //    text = "SELECT value as key, key as value FROM tab",
 //    expectedResult = Seq(Row(3, 0), Row(3, 3))
@@ -1060,8 +1080,7 @@ abstract class UpdateSuiteBase
   )
 
   testSparkMasterOnly("Variant type") {
-    val df = sql(
-      """SELECT parse_json(cast(id as string)) v, id i
+    val df = sql("""SELECT parse_json(cast(id as string)) v, id i
         FROM range(2)""")
     append(df)
     executeUpdate(
@@ -1076,8 +1095,14 @@ abstract class UpdateSuiteBase
   test("update on partitioned table with special chars") {
     val partA = "part%one"
     val partB = "part%two"
-    spark.range(0, 3, 1, 1).toDF("key").withColumn("value", lit(partA))
-      .write.format("delta").partitionBy("value").save(tempPath)
+    spark
+      .range(0, 3, 1, 1)
+      .toDF("key")
+      .withColumn("value", lit(partA))
+      .write
+      .format("delta")
+      .partitionBy("value")
+      .save(tempPath)
     checkUpdate(
       condition = Some(s"value = '$partA' AND key = 1"),
       setClauses = s"value = '$partB'",
