@@ -163,15 +163,19 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
                  STORED AS ORC LOCATION '$orcLoc'""")
             sql("INSERT INTO test_orc PARTITION(pid=2) SELECT 2")
             sql(s"ALTER TABLE test_parquet ADD PARTITION (pid=2) LOCATION '$orcLoc/pid=2'")
-            // Change partition file format from PARQUET to ORC using SET SERDE.
-            // Spark SQL does not support ALTER TABLE SET FILEFORMAT, but SET SERDE
-            // achieves the same effect for Hive serde tables.
-            sql("""ALTER TABLE test_parquet PARTITION(pid=2)
-                 SET SERDE 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'""")
-            sql("""ALTER TABLE test_parquet PARTITION(pid=2)
-                 SET FILEFORMAT INPUTFORMAT 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat'
-                 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat'
-                 SERDE 'org.apache.hadoop.hive.ql.io.orc.OrcSerde'""")
+            // Change partition file format from PARQUET to ORC using the catalog API.
+            // Spark SQL's ALTER TABLE SET SERDE/FILEFORMAT delegates to hiveClient.runSqlHive
+            // which creates a separate Hive session that can't see tables created by sql().
+            val catalog = spark.sessionState.catalog
+            val partSpec = Map("pid" -> "2")
+            val oldPart = catalog.getPartition(TableIdentifier("test_parquet"), partSpec)
+            val newStorage = oldPart.storage.copy(
+              inputFormat = Some("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"),
+              outputFormat = Some("org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"),
+              serde = Some("org.apache.hadoop.hive.ql.io.orc.OrcSerde"))
+            catalog.alterPartitions(
+              TableIdentifier("test_parquet"),
+              Seq(oldPart.copy(storage = newStorage)))
             val df = sql("select pid, id from test_parquet order by pid")
             checkAnswer(df, Seq(Row(1, 2), Row(2, 2)))
             checkOperatorMatch[HiveTableScanExecTransformer](df)
