@@ -606,6 +606,9 @@ jobs:
 
   build-and-deploy-bundle-package-centos8:
     needs: [build-native-lib-centos-7, build-internal-dependency]
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         scala_version: [ 2.12, 2.13 ]
