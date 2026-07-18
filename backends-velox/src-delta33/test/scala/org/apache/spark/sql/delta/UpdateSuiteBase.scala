@@ -17,6 +17,7 @@
 package org.apache.spark.sql.delta
 
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
+// scalastyle:off import.ordering.noEmptyLine
 import org.apache.spark.sql.delta.sources.DeltaSQLConf
 import org.apache.spark.sql.delta.test.DeltaSQLTestUtils
 import org.apache.spark.sql.execution.FileSourceScanExec
@@ -26,7 +27,6 @@ import org.apache.spark.sql.internal.SQLConf.StoreAssignmentPolicy
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types._
 
-// scalastyle:off import.ordering.noEmptyLine
 import java.util.Locale
 
 import scala.language.implicitConversions

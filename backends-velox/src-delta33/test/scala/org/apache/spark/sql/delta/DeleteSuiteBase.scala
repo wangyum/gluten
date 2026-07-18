@@ -17,7 +17,6 @@
 package org.apache.spark.sql.delta
 
 import org.apache.spark.sql.{AnalysisException, DataFrame, QueryTest, Row}
-// scalastyle:off import.ordering.noEmptyLine
 import org.apache.spark.sql.delta.sources.DeltaSQLConf
 import org.apache.spark.sql.execution.FileSourceScanExec
 import org.apache.spark.sql.functions.{lit, struct}
