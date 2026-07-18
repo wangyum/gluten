@@ -1,31 +1,21 @@
-Subject: [PATCH] Update some default config
----
-Index: gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
---- a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision 6a5103c30a3e99ede96e3d6c61f94680e4c95f04)
-+++ b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision c071a96208ff2d647f5f24d16eaf966710e3ceaf)
-@@ -78,7 +78,7 @@
+index eb0839677..a5e3f2e1b 100644
+--- a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
++++ b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
+@@ -84,7 +84,7 @@ object GlutenCoreConfig extends ConfigRegistry {
          "Whether to enable gluten. Default value is true. Just an experimental property." +
            " Recommend to enable/disable Gluten through the setting for spark.plugins.")
        .booleanConf
 -      .createWithDefault(true)
 +      .createWithDefault(false)
  
-   // Options used by RAS.
-   val RAS_ENABLED =
-Index: gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
+   val GLUTEN_COST_MODEL =
+     buildConf("spark.gluten.costModel")
 diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
---- a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision 6a5103c30a3e99ede96e3d6c61f94680e4c95f04)
-+++ b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision c071a96208ff2d647f5f24d16eaf966710e3ceaf)
-@@ -976,7 +976,7 @@
+index 14610868e..346de63f1 100644
+--- a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
++++ b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
+@@ -1028,7 +1028,7 @@ object GlutenConfig extends ConfigRegistry {
          "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
            "shuffle will be used if the number of partitions is greater than this threshold.")
        .intConf
@@ -34,7 +24,7 @@ diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConf
  
    val COLUMNAR_SHUFFLE_SORT_COLUMNS_THRESHOLD =
      buildConf("spark.gluten.sql.columnar.shuffle.sort.columns.threshold")
-@@ -984,7 +984,7 @@
+@@ -1036,7 +1036,7 @@ object GlutenConfig extends ConfigRegistry {
          "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
            "shuffle will be used if the number of columns is greater than this threshold.")
        .intConf
@@ -43,12 +33,12 @@ diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConf
  
    val COLUMNAR_TABLE_CACHE_ENABLED =
      buildStaticConf("spark.gluten.sql.columnar.tableCache")
-@@ -1512,7 +1512,7 @@
+@@ -1594,7 +1594,7 @@ object GlutenConfig extends ConfigRegistry {
      buildStaticConf("spark.gluten.storage.hdfsViewfs.enabled")
        .doc("If enabled, gluten will convert the viewfs path to hdfs path in scala side")
        .booleanConf
 -      .createWithDefault(false)
 +      .createWithDefault(true)
  
-   val ENCRYPTED_PARQUET_FALLBACK_ENABLED =
-     buildConf("spark.gluten.sql.fallbackEncryptedParquet")
+   val AUTO_ADJUST_STAGE_RESOURCE_PROFILE_ENABLED =
+     buildConf("spark.gluten.auto.adjustStageResource.enabled")
