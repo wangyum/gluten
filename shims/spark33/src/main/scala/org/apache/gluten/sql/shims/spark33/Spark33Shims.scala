@@ -34,6 +34,7 @@ import org.apache.spark.sql.catalyst.util.TimestampFormatter
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.execution.{FileSourceScanExec, PartitionedFileUtil, QueryExecution, SparkPlan, SparkPlanner}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.FileFormatWriter.Empty2Null
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFilters
@@ -156,6 +157,9 @@ class Spark33Shims extends SparkShims {
 
   def getFileStatus(partition: PartitionDirectory): Seq[(FileStatus, Map[String, Any])] =
     partition.files.map(f => (f, Map.empty[String, Any]))
+
+  def getCtasTableProvider(ctas: CreateDataSourceTableAsSelectCommand): Option[String] =
+    ctas.table.provider
 
   def isFileSplittable(
       relation: HadoopFsRelation,

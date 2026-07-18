@@ -35,6 +35,7 @@ import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.connector.read.streaming.SparkDataStream
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFilters
 import org.apache.spark.sql.execution.datasources.v2.{BatchScanExec, DataSourceV2ScanExecBase}
@@ -150,6 +151,12 @@ trait SparkShims {
   def getFileStatus(partition: PartitionDirectory): Seq[(FileStatus, Map[String, Any])]
 
   def isFileSplittable(relation: HadoopFsRelation, filePath: Path, sparkSchema: StructType): Boolean
+
+  /**
+   * Returns the table provider for a CTAS command. Spark versions differ in the field name:
+   * upstream Spark uses `table`, while internal Spark uses `catalogTable`.
+   */
+  def getCtasTableProvider(ctas: CreateDataSourceTableAsSelectCommand): Option[String]
 
   def isRowIndexMetadataColumn(name: String): Boolean
 
