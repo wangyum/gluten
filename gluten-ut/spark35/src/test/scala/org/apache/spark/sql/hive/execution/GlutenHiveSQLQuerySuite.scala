@@ -172,7 +172,8 @@ class GlutenHiveSQLQuerySuite extends GlutenHiveSQLQuerySuiteBase {
             val newStorage = oldPart.storage.copy(
               inputFormat = Some("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat"),
               outputFormat = Some("org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat"),
-              serde = Some("org.apache.hadoop.hive.ql.io.orc.OrcSerde"))
+              serde = Some("org.apache.hadoop.hive.ql.io.orc.OrcSerde")
+            )
             catalog.alterPartitions(
               TableIdentifier("test_parquet"),
               Seq(oldPart.copy(storage = newStorage)))
