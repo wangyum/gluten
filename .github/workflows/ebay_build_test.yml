@@ -141,9 +141,9 @@ jobs:
       - name: Install ebay-spark
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         run: |
-          build/mvn clean install -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          build/mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true
           ./dev/change-scala-version.sh 2.13
-          build/mvn clean install -Pscala-2.13 -Dhadoop.version=3.3.3.1.0.39 -DskipTests=true -Dmaven.javadoc.skip=true
+          build/mvn clean install -Pscala-2.13 -DskipTests=true -Dmaven.javadoc.skip=true
       - name: Save Maven cache
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         uses: actions/cache/save@v4
@@ -623,7 +623,7 @@ jobs:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
+          name: velox-native-lib-centos-7-${{github.sha}}
           path: ./cpp/build/releases
       - name: Download m2 dependency
         uses: actions/download-artifact@v4
@@ -637,7 +637,7 @@ jobs:
           yum install -y java-17-openjdk-devel wget
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
-          wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
+          wget https://archive.apache.org/dist/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
           tar -xvf apache-maven-3.8.9-bin.tar.gz
           mv apache-maven-3.8.9 /usr/lib/maven
       - name: Build and Deploy Bundle Package for Scala ${{ matrix.scala_version }}
@@ -658,8 +658,8 @@ jobs:
             export SPARK_SCALA_VERSION=2.12
             export SCALA_VERSION=2.12.18
           fi
-          $MVN_CMD clean install -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
-          $MVN_CMD -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dhadoop.version=3.3.3.1.0.39 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          $MVN_CMD clean install -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true
+          $MVN_CMD -s ./.github/settings.xml clean deploy -Pspark-3.5 -Pscala-${{ matrix.scala_version }} -Pjava-17 -Dscala.version=${SCALA_VERSION} -Pbackends-velox -Pceleborn -Piceberg -Pdelta -DskipTests=true -Dmaven.javadoc.skip=true -Dmaven.scaladoc.skip=true -Dmaven.source.skip -Dcyclonedx.skip=true -Dmaven.deploy.skip=true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload bundle package for Scala ${{ matrix.scala_version }}
