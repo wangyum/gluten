@@ -39,7 +39,7 @@ import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.python._
 import org.apache.spark.sql.extension.{GlutenCollapseProjectExecTransformerSuite, GlutenSessionExtensionSuite}
 import org.apache.spark.sql.gluten.GlutenFallbackSuite
-import org.apache.spark.sql.hive.execution._
+import org.apache.spark.sql.hive.execution.{GlutenHashAggregationQuerySuite, GlutenHashAggregationQueryWithControlledFallbackSuite, GlutenHashUDAQuerySuite, GlutenHashUDAQueryWithControlledFallbackSuite, GlutenHiveCommandSuite, GlutenHiveDDLSuite, GlutenHiveExplainSuite, GlutenHivePlanTest, GlutenHiveQuerySuite, GlutenHiveResolutionSuite, GlutenHiveScriptTransformationSuite, GlutenHiveSerDeReadWriteSuite, GlutenHiveSerDeSuite, GlutenHiveSQLQuerySuite, GlutenHiveSQLViewSuite, GlutenHiveTableScanSuite, GlutenHiveTypeCoercionSuite, GlutenHiveUDAFSuite, GlutenHiveUDFSuite, GlutenObjectHashAggregateSuite, GlutenPruneHiveTablePartitionsSuite, GlutenPruningSuite, GlutenSQLMetricsSuite, GlutenSQLQuerySuiteAE, GlutenWindowQuerySuite}
 import org.apache.spark.sql.sources._
 
 // Some settings' line length exceeds 100
