@@ -527,7 +527,6 @@ jobs:
             **/gluten-ut/**/core.*
 
   tpc-test-ubuntu-2204-celeborn:
-    if: ${{ contains(github.event.head_commit.message, '[celeborn]') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
     strategy:
       fail-fast: false
@@ -541,8 +540,8 @@ jobs:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: velox-native-lib-enhanced-centos-7-${{github.sha}}
-          path: ./cpp/build/releases
+          name: velox-native-lib-centos-7-${{github.sha}}
+          path: ./cpp/build/
       - name: Download m2 dependency
         uses: actions/download-artifact@v4
         with:
@@ -555,9 +554,6 @@ jobs:
           yum install -y java-17-openjdk-devel wget
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
-          wget https://dlcdn.apache.org/maven/maven-3/3.8.9/binaries/apache-maven-3.8.9-bin.tar.gz
-          tar -xvf apache-maven-3.8.9-bin.tar.gz
-          mv apache-maven-3.8.9 /usr/lib/maven
       - name: Build for Spark ${{ matrix.spark }}
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
@@ -607,6 +603,9 @@ jobs:
   build-and-deploy-bundle-package-centos8:
     if: ${{ contains(github.ref, 'release') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         scala_version: [ 2.12, 2.13 ]
