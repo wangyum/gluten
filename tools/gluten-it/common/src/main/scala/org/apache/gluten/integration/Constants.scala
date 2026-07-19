@@ -32,8 +32,6 @@ object Constants {
   val VELOX_CONF: SparkConf = new SparkConf(false)
     .set("spark.plugins", "org.apache.gluten.GlutenPlugin")
     .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
-    .set("spark.driver.extraJavaOptions", "-Darrow.memory.allocation.manager.type=unsafe")
-    .set("spark.executor.extraJavaOptions", "-Darrow.memory.allocation.manager.type=unsafe")
 
   val VELOX_WITH_CELEBORN_CONF: SparkConf = new SparkConf(false)
     .set("spark.plugins", "org.apache.gluten.GlutenPlugin")
@@ -47,8 +45,6 @@ object Constants {
     .set("spark.dynamicAllocation.enabled", "false")
     .set("spark.celeborn.push.data.timeout", "600s")
     .set("spark.celeborn.push.limit.inFlight.timeout", "1200s")
-    .set("spark.driver.extraJavaOptions", "-Darrow.memory.allocation.manager.type=unsafe")
-    .set("spark.executor.extraJavaOptions", "-Darrow.memory.allocation.manager.type=unsafe")
 
   val VELOX_WITH_UNIFFLE_CONF: SparkConf = new SparkConf(false)
     .set("spark.plugins", "org.apache.gluten.GlutenPlugin")

@@ -48,5 +48,6 @@ $JAVA_HOME/bin/java \
     $GLUTEN_IT_JVM_ARGS \
     -XX:ErrorFile=/var/log/java/hs_err_pid%p.log \
     -Dio.netty.tryReflectionSetAccessible=true \
+    -Darrow.memory.allocation.manager.type=unsafe \
     -cp $JAR_PATH \
     org.apache.gluten.integration.Cli "$@"
