@@ -933,6 +933,8 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("EXPLAIN CODEGEN command")
   enableSuite[GlutenHivePlanTest]
   enableSuite[GlutenHiveQuerySuite]
+    // Guava version difference: Ints.tryParse doesn't parse fullwidth digits
+    .exclude("HADP-53375: Avoid inconsistent behavior of IsInteger")
   enableSuite[GlutenHiveResolutionSuite]
   enableSuite[GlutenHiveSQLQuerySuite]
   enableSuite[GlutenHiveSQLViewSuite]
