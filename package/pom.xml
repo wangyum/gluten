@@ -164,6 +164,18 @@
                     <exclude>META-INF/NOTICE.txt</exclude>
                     <exclude>LICENSE.txt</exclude>
                     <exclude>NOTICE.txt</exclude>
+                    <!--
+                      Exclude DefaultAllocationManagerFactory from the shade bundle.
+                      Arrow 18.3.0+'s CheckAllocator inspects the URL of this class
+                      and throws "Unknown allocation manager type to infer" if the
+                      URL does not contain "memory-core", "memory-unsafe", or
+                      "memory-netty". When bundled inside gluten-package.jar the
+                      URL does not match, so defer to the upstream arrow-memory-*
+                      jar that provides a recognizable URL. See GLUTEN-12225.
+                    -->
+                    <exclude>org/apache/arrow/memory/DefaultAllocationManagerFactory.class</exclude>
+                    <exclude>org/apache/arrow/memory/unsafe/DefaultAllocationManagerFactory.class</exclude>
+                    <exclude>org/apache/arrow/memory/netty/DefaultAllocationManagerFactory.class</exclude>
                   </excludes>
                 </filter>
                 <filter>
