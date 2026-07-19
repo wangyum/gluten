@@ -541,7 +541,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: velox-native-lib-centos-7-${{github.sha}}
-          path: ./cpp/build/releases
+          path: ./cpp/build/
       - name: Download m2 dependency
         uses: actions/download-artifact@v4
         with:
