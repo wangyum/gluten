@@ -53,6 +53,7 @@ abstract class BaseMergeTwoPhasesHashBaseAggregateSuite extends WholeStageTransf
       .set("spark.sql.files.maxPartitionBytes", "1g")
       .set("spark.sql.shuffle.partitions", "1")
       .set("spark.memory.offHeap.size", "2g")
+      .set("spark.sql.execution.combineAdjacentAggregation", "false")
       .set(GlutenConfig.MERGE_TWO_PHASES_ENABLED.key, "true")
     if (BackendTestUtils.isCHBackendLoaded()) {
       conf

@@ -137,15 +137,15 @@ class HivePartitionConverter(hadoopConf: Configuration, session: SparkSession)
     SparkShimLoader.getSparkShims
       .getFileStatus(partitionDirectory)
       .flatMap {
-        f =>
+        case (f, metadata) =>
           SparkShimLoader.getSparkShims.splitFiles(
             session,
-            f._1,
-            f._1.getPath,
-            isSplitable = canBeSplit(f._1.getPath),
+            f,
+            f.getPath,
+            isSplitable = canBeSplit(f.getPath),
             maxSplitBytes,
-            partitionDirectory.values
-          )
+            partitionDirectory.values,
+            metadata)
       }
       .sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
