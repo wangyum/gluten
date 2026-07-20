@@ -160,7 +160,8 @@ object GlutenDeltaFileFormatWriter extends LoggingShims {
       timeZoneId = caseInsensitiveOptions
         .get(DateTimeUtils.TIMEZONE_OPTION)
         .getOrElse(sparkSession.sessionState.conf.sessionLocalTimeZone),
-      statsTrackers = maybeWrappedStatsTrackers
+      statsTrackers = maybeWrappedStatsTrackers,
+      maxCreatedFilesPerTask = sparkSession.sessionState.conf.maxCreatedFilesPerTask
     )
 
     // We should first sort by dynamic partition columns, then bucket id, and finally sorting
