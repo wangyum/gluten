@@ -63,7 +63,7 @@ object GenerateArrowProjection extends CodeGenerator[Seq[Expression], ArrowProje
       case (NoOp, _) => false
       case _ => true
     }
-    val exprVals = ctx.generateExpressions(validExpr.map(_._1), useSubexprElimination)
+    val (exprVals, initBlock) = ctx.generateExpressions(validExpr.map(_._1), useSubexprElimination)
 
     // 4-tuples: (code for projection, isNull variable name, value variable name, column index)
     val projectionCodes: Seq[(String, String)] = validExpr.zip(exprVals).map {
@@ -143,6 +143,7 @@ object GenerateArrowProjection extends CodeGenerator[Seq[Expression], ArrowProje
 
         public java.lang.Object apply(java.lang.Object _i) {
           InternalRow ${ctx.INPUT_ROW} = (InternalRow) _i;
+          $initBlock
           $evalSubexpr
           $allProjections
           // copy all the results into intermediate
