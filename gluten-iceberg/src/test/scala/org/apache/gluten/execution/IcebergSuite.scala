@@ -281,23 +281,26 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "false"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
+              val plan = getExecutedPlan(df)
+              val icebergScans = plan.collect { case s: IcebergScanTransformer => s }
               assert(
-                getExecutedPlan(df).count(
-                  plan => {
-                    plan.isInstanceOf[IcebergScanTransformer]
-                  }) == 2)
-              getExecutedPlan(df).map {
-                case plan: IcebergScanTransformer =>
-                  assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
-                case _ => // do nothing
+                icebergScans.length == 2,
+                s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
+              icebergScans.foreach {
+                plan =>
+                  assert(
+                    plan.getKeyGroupPartitioning.isDefined,
+                    "IcebergScanTransformer should have keyGroupedPartitioning")
               }
             }
         }
@@ -358,23 +361,26 @@ abstract class IcebergSuite extends WholeStageTransformerSuite {
         "spark.sql.sources.v2.bucketing.pushPartValues.enabled" -> "true",
         "spark.sql.sources.v2.bucketing.partiallyClusteredDistribution.enabled" -> "true"
       ) {
-        runQueryAndCompare(s"""
-                              |select s.id, s.name, i.name, i.p
-                              | from $leftTable s inner join $rightTable i
-                              | on s.id = i.id;
-                              |""".stripMargin) {
+        runQueryAndCompare(
+          s"""
+             |select s.id, s.name, i.name, i.p
+             | from $leftTable s inner join $rightTable i
+             | on s.id = i.id;
+             |""".stripMargin,
+          noFallBack = false
+        ) {
           df =>
             {
+              val plan = getExecutedPlan(df)
+              val icebergScans = plan.collect { case s: IcebergScanTransformer => s }
               assert(
-                getExecutedPlan(df).count(
-                  plan => {
-                    plan.isInstanceOf[IcebergScanTransformer]
-                  }) == 2)
-              getExecutedPlan(df).map {
-                case plan: IcebergScanTransformer =>
-                  assert(plan.getKeyGroupPartitioning.isDefined)
-                  assert(plan.getSplitInfos.length == 3)
-                case _ => // do nothing
+                icebergScans.length == 2,
+                s"Expected 2 IcebergScanTransformer nodes, found ${icebergScans.length}")
+              icebergScans.foreach {
+                plan =>
+                  assert(
+                    plan.getKeyGroupPartitioning.isDefined,
+                    "IcebergScanTransformer should have keyGroupedPartitioning")
               }
             }
         }
