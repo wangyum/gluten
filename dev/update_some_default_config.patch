@@ -1,0 +1,54 @@
+Subject: [PATCH] Update some default config
+---
+Index: gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala
+--- a/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision 8121fa1796e5ddde5f6a92f26a04adc92d1b52f4)
++++ b/gluten-core/src/main/scala/org/apache/gluten/config/GlutenCoreConfig.scala	(revision 8338deec775ea26c3683032d7437e22ff55dad59)
+@@ -84,7 +84,7 @@
+         "Whether to enable gluten. Default value is true. Just an experimental property." +
+           " Recommend to enable/disable Gluten through the setting for spark.plugins.")
+       .booleanConf
+-      .createWithDefault(true)
++      .createWithDefault(false)
+
+   val GLUTEN_COST_MODEL =
+     buildConf("spark.gluten.costModel")
+Index: gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala
+--- a/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision 8121fa1796e5ddde5f6a92f26a04adc92d1b52f4)
++++ b/gluten-substrait/src/main/scala/org/apache/gluten/config/GlutenConfig.scala	(revision 8338deec775ea26c3683032d7437e22ff55dad59)
+@@ -1028,7 +1028,7 @@
+         "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
+           "shuffle will be used if the number of partitions is greater than this threshold.")
+       .intConf
+-      .createWithDefault(4000)
++      .createWithDefault(0)
+
+   val COLUMNAR_SHUFFLE_SORT_COLUMNS_THRESHOLD =
+     buildConf("spark.gluten.sql.columnar.shuffle.sort.columns.threshold")
+@@ -1036,7 +1036,7 @@
+         "The threshold to determine whether to use sort-based columnar shuffle. Sort-based " +
+           "shuffle will be used if the number of columns is greater than this threshold.")
+       .intConf
+-      .createWithDefault(100000)
++      .createWithDefault(0)
+
+   val COLUMNAR_TABLE_CACHE_ENABLED =
+     buildStaticConf("spark.gluten.sql.columnar.tableCache")
+@@ -1594,7 +1594,7 @@
+     buildStaticConf("spark.gluten.storage.hdfsViewfs.enabled")
+       .doc("If enabled, gluten will convert the viewfs path to hdfs path in scala side")
+       .booleanConf
+-      .createWithDefault(false)
++      .createWithDefault(true)
+
+   val AUTO_ADJUST_STAGE_RESOURCE_PROFILE_ENABLED =
+     buildConf("spark.gluten.auto.adjustStageResource.enabled")
