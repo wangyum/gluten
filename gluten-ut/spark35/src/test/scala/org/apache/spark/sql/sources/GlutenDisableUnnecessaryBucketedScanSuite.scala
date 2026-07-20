@@ -16,6 +16,8 @@
  */
 package org.apache.spark.sql.sources
 
+import org.apache.gluten.execution.FileSourceScanExecTransformer
+
 import org.apache.spark.sql.GlutenSQLTestsBaseTrait
 
 class GlutenDisableUnnecessaryBucketedScanWithoutHiveSupportSuite
@@ -24,4 +26,14 @@ class GlutenDisableUnnecessaryBucketedScanWithoutHiveSupportSuite
 
 class GlutenDisableUnnecessaryBucketedScanWithoutHiveSupportSuiteAE
   extends DisableUnnecessaryBucketedScanWithoutHiveSupportSuiteAE
-  with GlutenSQLTestsBaseTrait {}
+  with GlutenSQLTestsBaseTrait {
+  override def checkNumBucketedScan(query: String, expectedNumBucketedScan: Int): Unit = {
+    val df = sql(query)
+    df.collect()
+    val plan = df.queryExecution.executedPlan
+    val bucketedScan = collect(plan) {
+      case s: FileSourceScanExecTransformer if s.bucketedScan => s
+    }
+    assert(bucketedScan.length == expectedNumBucketedScan)
+  }
+}
