@@ -1,0 +1,328 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Auto Rebase Upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to rebase onto upstream/main
+        required: true
+        default: main-ebay
+      ai_model:
+        description: GitHub Models model for conflict resolution
+        required: false
+        default: gpt-4.1
+  schedule:
+    - cron: '0 20 * * *'
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+  packages: write
+  models: read
+
+concurrency:
+  group: auto-rebase-${{ github.event.inputs.target_branch || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        branch:
+          - "${{ github.event.inputs.target_branch || 'main-ebay' }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.target_branch || 'main-ebay' }}
+          persist-credentials: false
+
+      - name: Configure Git
+        run: |
+          git config user.name "automation"
+          git config user.email "automation@users.noreply.github.com"
+
+      - name: Ensure upstream remote
+        run: |
+          git remote add upstream https://github.com/apache/incubator-gluten.git 2>/dev/null || \
+          git remote set-url upstream https://github.com/apache/incubator-gluten.git
+          git fetch upstream main --prune
+
+      - name: Set up PAT for pushing
+        run: |
+          git remote set-url origin https://${{ secrets.GH_PAT }}@github.com/wangyum/incubator-gluten.git
+          git config credential.helper ''
+
+      - name: Write AI conflict resolver
+        run: |
+          cat > /tmp/resolve_rebase_conflicts_ai.py <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+          import urllib.error
+          import urllib.request
+
+          GITHUB_MODELS_API = "https://models.inference.ai.azure.com/chat/completions"
+
+
+          def conflicted_files():
+              p = subprocess.run(
+                  ["git", "diff", "--name-only", "--diff-filter=U", "-z"],
+                  capture_output=True,
+                  check=True,
+              )
+              return [
+                  f
+                  for f in p.stdout.decode("utf-8", errors="replace").split("\0")
+                  if f
+              ]
+
+
+          def read_stage_blob(path, stage):
+              p = subprocess.run(
+                  ["git", "show", f":{stage}:{path}"],
+                  capture_output=True,
+              )
+              if p.returncode != 0:
+                  return None
+              return p.stdout
+
+
+          def is_binary(blob):
+              return blob is not None and b"\x00" in blob
+
+
+          def decode(blob):
+              if blob is None:
+                  return ""
+              return blob.decode("utf-8", errors="replace")
+
+
+          def fallback_checkout(path):
+              pick = subprocess.run(
+                  ["git", "checkout", "--theirs", "--", path],
+                  capture_output=True,
+              )
+              if pick.returncode != 0:
+                  pick = subprocess.run(
+                      ["git", "checkout", "--ours", "--", path],
+                      capture_output=True,
+                  )
+                  if pick.returncode != 0:
+                      subprocess.run(["git", "add", "-A", "--", path], check=True)
+                      return
+              subprocess.run(["git", "add", "-A", "--", path], check=True)
+
+
+          def strip_code_fences(text):
+              out = text.strip()
+              if out.startswith("```"):
+                  lines = out.splitlines()
+                  if lines and lines[0].startswith("```"):
+                      lines = lines[1:]
+                  if lines and lines[-1].startswith("```"):
+                      lines = lines[:-1]
+                  out = "\n".join(lines)
+              return out
+
+
+          def call_model(path, base_text, ours_text, theirs_text, token, model):
+              if not token:
+                  raise RuntimeError("Missing GITHUB_TOKEN/GH_TOKEN for GitHub Models API")
+
+              prompt = (
+                  "Resolve this git rebase conflict and return ONLY the merged file content.\\n"
+                  "Do not include markdown, code fences, or explanations.\\n"
+                  "Do not leave conflict markers.\\n"
+                  f"File: {path}\\n\\n"
+                  "[BASE]\\n"
+                  f"{base_text}\\n"
+                  "[/BASE]\\n\\n"
+                  "[OURS]\\n"
+                  f"{ours_text}\\n"
+                  "[/OURS]\\n\\n"
+                  "[THEIRS]\\n"
+                  f"{theirs_text}\\n"
+                  "[/THEIRS]\\n"
+              )
+
+              payload = {
+                  "model": model,
+                  "messages": [{"role": "user", "content": prompt}],
+              }
+              req = urllib.request.Request(
+                  GITHUB_MODELS_API,
+                  data=json.dumps(payload).encode("utf-8"),
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                  },
+                  method="POST",
+              )
+
+              try:
+                  with urllib.request.urlopen(req, timeout=300) as resp:
+                      body = resp.read()
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode("utf-8", errors="replace")
+                  raise RuntimeError(
+                      f"GitHub Models API error for {path}: {exc.code} {detail[:500]}"
+                  )
+
+              data = json.loads(body.decode("utf-8"))
+              content = data["choices"][0]["message"]["content"]
+              if isinstance(content, list):
+                  content = "".join(
+                      item.get("text", "")
+                      for item in content
+                      if isinstance(item, dict)
+                  )
+              if not isinstance(content, str) or not content.strip():
+                  raise RuntimeError(f"Empty model response for {path}")
+
+              merged = strip_code_fences(content)
+              if "<<<<<<<" in merged or "=======" in merged or ">>>>>>>" in merged:
+                  raise RuntimeError(f"Model returned unresolved markers for {path}")
+              return merged
+
+
+          def main():
+              token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+              model = os.environ.get("AI_MODEL", "gpt-4.1")
+
+              files = conflicted_files()
+              if not files:
+                  print("No conflicted files to resolve.")
+                  return 0
+
+              print(f"Resolving {len(files)} conflicted file(s) with AI model {model}...")
+              for path in files:
+                  base = read_stage_blob(path, 1)
+                  ours = read_stage_blob(path, 2)
+                  theirs = read_stage_blob(path, 3)
+
+                  if is_binary(base) or is_binary(ours) or is_binary(theirs):
+                      print(f"- {path}: binary conflict, using fallback checkout")
+                      fallback_checkout(path)
+                      continue
+                  if ours is None or theirs is None:
+                      print(f"- {path}: non-3-way conflict, using fallback checkout")
+                      fallback_checkout(path)
+                      continue
+
+                  try:
+                      merged = call_model(path, decode(base), decode(ours), decode(theirs), token, model)
+                  except Exception as exc:
+                      print(f"- {path}: AI resolution failed ({exc}); using fallback checkout")
+                      fallback_checkout(path)
+                      continue
+
+                  with open(path, "w", encoding="utf-8", newline="") as handle:
+                      handle.write(merged)
+                  subprocess.run(["git", "add", "--", path], check=True)
+                  print(f"- {path}: resolved by AI")
+
+              return 0
+
+
+          if __name__ == "__main__":
+              try:
+                  sys.exit(main())
+              except Exception as exc:
+                  print(f"AI conflict resolver failed: {exc}", file=sys.stderr)
+                  sys.exit(1)
+          PY
+
+      - name: Rebase onto upstream/main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_MODEL: ${{ github.event.inputs.ai_model || 'gpt-4.1' }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="${{ matrix.branch }}"
+          git checkout "$BRANCH"
+          BEFORE_SHA=$(git rev-parse HEAD)
+
+          if git merge-base --is-ancestor upstream/main "$BRANCH"; then
+            echo "Branch already contains upstream/main."
+          fi
+
+          if git rebase upstream/main; then
+            echo "Rebase completed without conflicts."
+          else
+            if [ ! -d .git/rebase-merge ] && [ ! -d .git/rebase-apply ]; then
+              echo "Rebase failed before conflict-resolution state was created."
+              exit 1
+            fi
+
+            echo "Rebase conflict detected. Attempting AI-assisted conflict resolution."
+            ATTEMPT=0
+            MAX_ATTEMPTS=30
+            while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+              ATTEMPT=$((ATTEMPT + 1))
+              if [ "$ATTEMPT" -gt "$MAX_ATTEMPTS" ]; then
+                echo "Exceeded max conflict-resolution attempts ($MAX_ATTEMPTS)."
+                git rebase --abort
+                exit 1
+              fi
+
+              if ! python3 /tmp/resolve_rebase_conflicts_ai.py; then
+                echo "AI resolver failed on attempt $ATTEMPT."
+                git rebase --abort
+                exit 1
+              fi
+
+              if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+                echo "Conflicts remain after AI resolution attempt $ATTEMPT."
+                git rebase --abort
+                exit 1
+              fi
+
+              if GIT_EDITOR=true git rebase --continue; then
+                echo "Rebase continue succeeded (attempt $ATTEMPT)."
+                continue
+              fi
+
+              if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+                echo "Additional conflicts detected after continue (attempt $ATTEMPT). Retrying."
+                continue
+              fi
+
+              echo "git rebase --continue failed for non-conflict reason."
+              git rebase --abort
+              exit 1
+            done
+          fi
+
+          AFTER_SHA=$(git rev-parse HEAD)
+          if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+            echo "No changes after rebase."
+            exit 0
+          fi
+          git push --force origin "$BRANCH"
+          echo "Rebased and pushed: $BEFORE_SHA -> $AFTER_SHA"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Rebase job finished for branch ${{ matrix.branch }}"
