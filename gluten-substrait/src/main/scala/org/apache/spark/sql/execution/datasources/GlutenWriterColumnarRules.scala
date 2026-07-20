@@ -19,7 +19,6 @@ package org.apache.spark.sql.execution.datasources
 import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.execution.ColumnarToRowExecBase
 import org.apache.gluten.execution.datasource.GlutenFormatFactory
-import org.apache.gluten.sql.shims.SparkShimLoader
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -43,8 +42,7 @@ object GlutenWriterColumnarRules {
     cmd match {
       case command: CreateDataSourceTableAsSelectCommand
           if !BackendsApiManager.getSettings.skipNativeCtas(command) =>
-        SparkShimLoader.getSparkShims.getCtasTableProvider(command)
-          .filter(GlutenFormatFactory.isRegistered)
+        command.catalogTable.provider.filter(GlutenFormatFactory.isRegistered)
       case command: InsertIntoHadoopFsRelationCommand
           if !BackendsApiManager.getSettings.skipNativeInsertInto(command) =>
         command.fileFormat match {

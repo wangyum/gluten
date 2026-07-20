@@ -103,8 +103,6 @@ install_centos_7() {
         yum -y install rh-git227
         source /opt/rh/rh-git227/enable
         echo "source /opt/rh/rh-git227/enable" >> ~/.bashrc
-        # Make git 2.27 available system-wide (e.g. in Docker RUN layers that don't source bashrc)
-        ln -sf /opt/rh/rh-git227/root/usr/bin/git /usr/local/bin/git
     fi
 
     # flex>=2.6.0

@@ -91,12 +91,12 @@ abstract class ColumnarWriteFilesExec protected (
       jobTrackerID: String,
       writeFilesSpec: WriteFilesSpec): RDD[WriterCommitMessage] = {
     val rddWithNonEmptyPartitions = session.sparkContext.parallelize(Seq.empty[InternalRow], 1)
-
     rddWithNonEmptyPartitions.mapPartitionsInternal {
       iterator =>
         val sparkStageId = TaskContext.get().stageId()
         val sparkPartitionId = TaskContext.get().partitionId()
         val sparkAttemptNumber = TaskContext.get().taskAttemptId().toInt & Int.MaxValue
+
         val ret = SparkShimLoader.getSparkShims.writeFilesExecuteTask(
           description,
           jobTrackerID,

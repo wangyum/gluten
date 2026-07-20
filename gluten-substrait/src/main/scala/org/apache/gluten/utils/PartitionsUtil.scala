@@ -106,15 +106,16 @@ case class PartitionsUtil(
               val filePath = file._1.getPath
               if (shouldProcess(filePath)) {
                 val isSplitable =
-                  relation.fileFormat.isSplitable(relation.sparkSession, relation.options, filePath)
+                  SparkShimLoader.getSparkShims.isFileSplittable(relation, filePath, requiredSchema)
                 SparkShimLoader.getSparkShims.splitFiles(
-                  relation.sparkSession,
-                  file._1,
-                  filePath,
-                  isSplitable,
-                  maxSplitBytes,
-                  partition.values,
-                  file._2)
+                  sparkSession = relation.sparkSession,
+                  file = file._1,
+                  filePath = filePath,
+                  isSplitable = isSplitable,
+                  maxSplitBytes = maxSplitBytes,
+                  partitionValues = partition.values,
+                  metadata = file._2
+                )
               } else {
                 Seq.empty
               }
