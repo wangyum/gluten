@@ -175,7 +175,10 @@ case class HiveTableScanExecTransformer(
       }
     formatCache.getOrElseUpdate(
       (cls, serdeKey),
-      getReadFileFormat(HiveClientImpl.fromHivePartition(partition).storage))
+      getReadFileFormat(
+        HiveClientImpl
+          .fromHivePartition(partition, relation.tableMeta.storage.locationUri)
+          .storage))
   }
 
   private def getReadFileFormat(storage: CatalogStorageFormat): ReadFileFormat = {
