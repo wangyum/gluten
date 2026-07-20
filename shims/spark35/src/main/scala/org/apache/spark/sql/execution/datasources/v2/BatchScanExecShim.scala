@@ -20,9 +20,10 @@ import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.KeyGroupedPartitioning
+import org.apache.spark.sql.catalyst.plans.physical.KeyedPartitioning
 import org.apache.spark.sql.catalyst.util.InternalRowComparableWrapper
 import org.apache.spark.sql.connector.catalog.Table
+import org.apache.spark.sql.connector.catalog.functions.Reducer
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation
 import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, Scan, SupportsRuntimeV2Filtering}
 import org.apache.spark.sql.execution.datasources.v2.orc.OrcScan
@@ -38,6 +39,9 @@ abstract class BatchScanExecShim(
     ordering: Option[Seq[SortOrder]] = None,
     @transient val table: Table,
     val commonPartitionValues: Option[Seq[(InternalRow, Int)]] = None,
+    // SPJ reducers are vestigial in spark35: GroupPartitionsExec (SPARK-55535) handles
+    // coalescing, so these are never read. Kept for constructor signature compatibility.
+    val reducers: Option[Seq[Option[Reducer[_, _]]]] = None,
     val applyPartialClustering: Boolean = false,
     val replicatePartitions: Boolean = false)
   extends AbstractBatchScanExec(
@@ -46,11 +50,7 @@ abstract class BatchScanExecShim(
     runtimeFilters,
     ordering,
     table,
-    StoragePartitionJoinParams(
-      keyGroupedPartitioning,
-      commonPartitionValues,
-      applyPartialClustering,
-      replicatePartitions)
+    keyGroupedPartitioning
   ) {
 
   // Note: "metrics" is made transient to avoid sending driver-side metrics to tasks.
@@ -77,7 +77,7 @@ abstract class BatchScanExecShim(
   @transient protected lazy val filteredPartitions: Seq[Seq[InputPartition]] = {
     val dataSourceFilters = runtimeFilters.flatMap {
       case DynamicPruningExpression(e) => DataSourceV2Strategy.translateRuntimeFilterV2(e)
-      case _ => None
+      case f => DataSourceV2Strategy.translateScalarSubqueryFilterV2(f)
     }
 
     if (dataSourceFilters.nonEmpty) {
@@ -91,49 +91,56 @@ abstract class BatchScanExecShim(
       val newPartitions = scan.toBatch.planInputPartitions()
 
       originalPartitioning match {
-        case p: KeyGroupedPartitioning =>
+        case k: KeyedPartitioning =>
           if (newPartitions.exists(!_.isInstanceOf[HasPartitionKey])) {
             throw new SparkException(
               "Data source must have preserved the original partitioning " +
                 "during runtime filtering: not all partitions implement HasPartitionKey after " +
                 "filtering")
           }
-          val newPartitionValues = newPartitions
-            .map(
-              partition =>
-                InternalRowComparableWrapper(
-                  partition.asInstanceOf[HasPartitionKey],
-                  p.expressions))
-            .toSet
-          val oldPartitionValues = p.partitionValues
-            .map(partition => InternalRowComparableWrapper(partition, p.expressions))
-            .toSet
-          // We require the new number of partition values to be equal or less than the old number
-          // of partition values here. In the case of less than, empty partitions will be added for
-          // those missing values that are not present in the new input partitions.
-          if (oldPartitionValues.size < newPartitionValues.size) {
-            throw new SparkException(
-              "During runtime filtering, data source must either report " +
-                "the same number of partition values, or a subset of partition values from the " +
-                s"original. Before: ${oldPartitionValues.size} partition values. " +
-                s"After: ${newPartitionValues.size} partition values")
-          }
 
-          if (!newPartitionValues.forall(oldPartitionValues.contains)) {
+          val inputMap = k.partitionKeys.groupBy(identity).mapValues(_.size)
+          val comparableKeyWrapperFactory = InternalRowComparableWrapper
+            .getInternalRowComparableWrapperFactory(k.expressionDataTypes)
+          val filteredMap = newPartitions.groupBy(
+            p => comparableKeyWrapperFactory(p.asInstanceOf[HasPartitionKey].partitionKey()))
+
+          if (!filteredMap.keySet.subsetOf(inputMap.keySet)) {
             throw new SparkException(
               "During runtime filtering, data source must not report new " +
-                "partition values that are not present in the original partitioning.")
+                "partition keys that are not present in the original partitioning.")
           }
 
-          groupPartitions(newPartitions).get.map(_._2)
+          inputMap.toSeq
+            .sortBy(_._1)(k.keyOrdering)
+            .flatMap {
+              case (key, size) =>
+                val fps = filteredMap.getOrElse(key, Array.empty)
+
+                if (fps.size > size) {
+                  throw new SparkException(
+                    "During runtime filtering, data source must not report " +
+                      s"new partitions for a given key. Before: $size partitions. " +
+                      s"After: ${fps.size} partitions")
+                }
+
+                fps.map(Seq(_)).padTo(size, Seq.empty)
+            }
 
         case _ =>
           // no validation is needed as the data source did not report any specific partitioning
-          newPartitions.map(Seq(_))
+          newPartitions.toSeq.map(Seq(_))
       }
 
     } else {
-      partitions
+      (outputPartitioning match {
+        case k: KeyedPartitioning =>
+          inputPartitions
+            .sortBy(_.asInstanceOf[HasPartitionKey].partitionKey())(k.keyRowOrdering)
+            .map(Seq(_))
+
+        case _ => inputPartitions.map(Seq(_))
+      })
     }
   }
 
@@ -144,4 +151,23 @@ abstract class BatchScanExecShim(
       case _ => None
     }
   }
+}
+
+abstract class ArrowBatchScanExecShim(original: BatchScanExec)
+// SPJ params (commonPartitionValues, reducers, applyPartialClustering,
+// replicatePartitions) are intentionally omitted: in spark35, GroupPartitionsExec
+// (SPARK-55535) handles SPJ coalescing, so these params are not used.
+  extends BatchScanExecShim(
+    original.output,
+    original.scan,
+    original.runtimeFilters,
+    original.keyGroupedPartitioning,
+    original.ordering,
+    original.table
+  ) {
+  override def scan: Scan = original.scan
+
+  override def ordering: Option[Seq[SortOrder]] = original.ordering
+
+  override def output: Seq[Attribute] = original.output
 }
