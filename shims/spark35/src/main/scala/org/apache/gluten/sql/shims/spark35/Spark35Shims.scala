@@ -32,13 +32,13 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.plans.physical.{KeyGroupedPartitioning, Partitioning}
+import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
-import org.apache.spark.sql.catalyst.util.{InternalRowComparableWrapper, TimestampFormatter}
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec
+import org.apache.spark.sql.catalyst.util.TimestampFormatter
 import org.apache.spark.sql.connector.catalog.Table
-import org.apache.spark.sql.connector.read.{HasPartitionKey, InputPartition, Scan}
+import org.apache.spark.sql.connector.read.{InputPartition, Scan}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.datasources._
@@ -287,7 +287,17 @@ class Spark35Shims extends SparkShims {
     shuffle.advisoryPartitionSize
 
   def getFileStatus(partition: PartitionDirectory): Seq[(FileStatus, Map[String, Any])] =
-    partition.files.map(f => (f.fileStatus, f.metadata))
+    partition.files.map {
+      f =>
+        // FileStatusWithMetadata.fileStatus can be null when PartitionDirectory is created via
+        // the backward-compat constructor (Array[FileStatus]). Reconstruct from fallback fields.
+        val fs = if (f.fileStatus != null) {
+          f.fileStatus
+        } else {
+          new FileStatus(f.length, f.isDirectory, 0, 0, f.modificationTime, f.path)
+        }
+        (fs, f.metadata)
+    }
 
   def isFileSplittable(
       relation: HadoopFsRelation,
@@ -354,7 +364,9 @@ class Spark35Shims extends SparkShims {
 
   override def getCommonPartitionValues(
       batchScan: BatchScanExec): Option[Seq[(InternalRow, Int)]] = {
-    batchScan.spjParams.commonPartitionValues
+    // SPARK-55535 moved SPJ grouping logic from BatchScanExec to GroupPartitionsExec.
+    // BatchScanExec no longer carries commonPartitionValues.
+    None
   }
 
   override def orderPartitions(
@@ -367,110 +379,10 @@ class Spark35Shims extends SparkShims {
       applyPartialClustering: Boolean,
       replicatePartitions: Boolean,
       joinKeyPositions: Option[Seq[Int]] = None): Seq[Seq[InputPartition]] = {
-    scan match {
-      case _ if keyGroupedPartitioning.isDefined =>
-        var finalPartitions = filteredPartitions
-
-        outputPartitioning match {
-          case p: KeyGroupedPartitioning =>
-            if (
-              SQLConf.get.v2BucketingPushPartValuesEnabled &&
-              SQLConf.get.v2BucketingPartiallyClusteredDistributionEnabled
-            ) {
-              assert(
-                filteredPartitions.forall(_.size == 1),
-                "Expect partitions to be not grouped when " +
-                  s"${SQLConf.V2_BUCKETING_PARTIALLY_CLUSTERED_DISTRIBUTION_ENABLED.key} " +
-                  "is enabled"
-              )
-
-              val groupedPartitions = batchScan
-                .groupPartitions(finalPartitions.map(_.head), true)
-                .getOrElse(Seq.empty)
-
-              // This means the input partitions are not grouped by partition values. We'll need to
-              // check `groupByPartitionValues` and decide whether to group and replicate splits
-              // within a partition.
-              if (commonPartitionValues.isDefined && applyPartialClustering) {
-                // A mapping from the common partition values to how many splits the partition
-                // should contain. Note this no longer maintain the partition key ordering.
-                val commonPartValuesMap = commonPartitionValues.get
-                  .map(t => (InternalRowComparableWrapper(t._1, p.expressions), t._2))
-                  .toMap
-                val nestGroupedPartitions = groupedPartitions.map {
-                  case (partValue, splits) =>
-                    // `commonPartValuesMap` should contain the part value since it's the super set.
-                    val numSplits = commonPartValuesMap
-                      .get(InternalRowComparableWrapper(partValue, p.expressions))
-                    assert(
-                      numSplits.isDefined,
-                      s"Partition value $partValue does not exist in " +
-                        "common partition values from Spark plan")
-
-                    val newSplits = if (replicatePartitions) {
-                      // We need to also replicate partitions according to the other side of join
-                      Seq.fill(numSplits.get)(splits)
-                    } else {
-                      // Not grouping by partition values: this could be the side with partially
-                      // clustered distribution. Because of dynamic filtering, we'll need to check
-                      // if the final number of splits of a partition is smaller than the original
-                      // number, and fill with empty splits if so. This is necessary so that both
-                      // sides of a join will have the same number of partitions & splits.
-                      splits.map(Seq(_)).padTo(numSplits.get, Seq.empty)
-                    }
-                    (InternalRowComparableWrapper(partValue, p.expressions), newSplits)
-                }
-
-                // Now fill missing partition keys with empty partitions
-                val partitionMapping = nestGroupedPartitions.toMap
-                finalPartitions = commonPartitionValues.get.flatMap {
-                  case (partValue, numSplits) =>
-                    // Use empty partition for those partition values that are not present.
-                    partitionMapping.getOrElse(
-                      InternalRowComparableWrapper(partValue, p.expressions),
-                      Seq.fill(numSplits)(Seq.empty))
-                }
-              } else {
-                // either `commonPartitionValues` is not defined, or it is defined but
-                // `applyPartialClustering` is false.
-                val partitionMapping = groupedPartitions.map {
-                  case (row, parts) =>
-                    InternalRowComparableWrapper(row, p.expressions) -> parts
-                }.toMap
-
-                // In case `commonPartitionValues` is not defined (e.g., SPJ is not used), there
-                // could exist duplicated partition values, as partition grouping is not done
-                // at the beginning and postponed to this method. It is important to use unique
-                // partition values here so that grouped partitions won't get duplicated.
-                finalPartitions = p.uniquePartitionValues.map {
-                  partValue =>
-                    // Use empty partition for those partition values that are not present
-                    partitionMapping.getOrElse(
-                      InternalRowComparableWrapper(partValue, p.expressions),
-                      Seq.empty)
-                }
-              }
-            } else {
-              val partitionMapping = finalPartitions.map {
-                parts =>
-                  val row = parts.head.asInstanceOf[HasPartitionKey].partitionKey()
-                  InternalRowComparableWrapper(row, p.expressions) -> parts
-              }.toMap
-              finalPartitions = p.partitionValues.map {
-                partValue =>
-                  // Use empty partition for those partition values that are not present
-                  partitionMapping.getOrElse(
-                    InternalRowComparableWrapper(partValue, p.expressions),
-                    Seq.empty)
-              }
-            }
-
-          case _ =>
-        }
-        finalPartitions
-      case _ =>
-        filteredPartitions
-    }
+    // SPARK-55535 moved SPJ grouping logic from BatchScanExec to GroupPartitionsExec.
+    // The scan should only report raw (runtime-filtered, key-sorted) partitions.
+    // GroupPartitionsExec will handle partition coalescing and alignment.
+    filteredPartitions
   }
 
   override def withTryEvalMode(expr: Expression): Boolean = {
