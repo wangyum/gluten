@@ -28,11 +28,21 @@ import org.scalatest.exceptions.TestFailedException
 
 import java.sql.{Date, Timestamp}
 
+import scala.concurrent.duration._
+
 class GlutenJsonSuite extends JsonSuite with GlutenSQLTestsBaseTrait {
 
   /** Returns full path to the given file in the resource folder */
   override protected def testFile(fileName: String): String = {
     getWorkspaceFilePath("sql", "core", "src", "test", "resources").toString + "/" + fileName
+  }
+
+  // RAS may leave a task reporting as running beyond Spark's default 10s timeout.
+  override protected def waitForTasksToFinish(): Unit = {
+    eventually(timeout(60.seconds)) {
+      assert(spark.sparkContext.statusTracker
+        .getExecutorInfos.map(_.numRunningTasks()).sum == 0)
+    }
   }
 }
 
