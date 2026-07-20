@@ -32,11 +32,11 @@ class GlutenCastSuite extends CastWithAnsiOffSuite with GlutenTestsTrait {
     v match {
       case lit: Expression =>
         logDebug(s"Cast from: ${lit.dataType.typeName}, to: ${targetType.typeName}")
-        Cast(lit, targetType, timeZoneId)
+        Cast(lit, targetType, timeZoneId, evalMode)
       case _ =>
         val lit = Literal(v)
         logDebug(s"Cast from: ${lit.dataType.typeName}, to: ${targetType.typeName}")
-        Cast(lit, targetType, timeZoneId)
+        Cast(lit, targetType, timeZoneId, evalMode)
     }
   }
 
