@@ -1,5 +1,5 @@
 == Physical Plan ==
-AdaptiveSparkPlan (61)
+AdaptiveSparkPlan (62)
 +- == Final Plan ==
    VeloxColumnarToRow (39)
    +- ^ ProjectExecTransformer (37)
@@ -34,27 +34,28 @@ AdaptiveSparkPlan (61)
                                           +- ^ FilterExecTransformer (22)
                                              +- ^ FileSourceScanExecTransformer parquet  (21)
 +- == Initial Plan ==
-   HashAggregate (60)
-   +- Project (59)
-      +- SortMergeJoin Inner (58)
-         :- Project (50)
-         :  +- SortMergeJoin Inner (49)
-         :     :- Sort (43)
-         :     :  +- Exchange (42)
-         :     :     +- Filter (41)
-         :     :        +- Scan parquet (40)
-         :     +- Sort (48)
-         :        +- Exchange (47)
-         :           +- Project (46)
-         :              +- Filter (45)
-         :                 +- Scan parquet (44)
-         +- Sort (57)
-            +- Filter (56)
-               +- HashAggregate (55)
-                  +- Exchange (54)
-                     +- HashAggregate (53)
-                        +- Filter (52)
-                           +- Scan parquet (51)
+   HashAggregate (61)
+   +- HashAggregate (60)
+      +- Project (59)
+         +- SortMergeJoin Inner (58)
+            :- Project (50)
+            :  +- SortMergeJoin Inner (49)
+            :     :- Sort (43)
+            :     :  +- Exchange (42)
+            :     :     +- Filter (41)
+            :     :        +- Scan parquet (40)
+            :     +- Sort (48)
+            :        +- Exchange (47)
+            :           +- Project (46)
+            :              +- Filter (45)
+            :                 +- Scan parquet (44)
+            +- Sort (57)
+               +- Filter (56)
+                  +- HashAggregate (55)
+                     +- Exchange (54)
+                        +- HashAggregate (53)
+                           +- Filter (52)
+                              +- Scan parquet (51)
 
 
 (1) FileSourceScanExecTransformer parquet 
@@ -330,10 +331,17 @@ Input [5]: [l_quantity#X, l_extendedprice#X, p_partkey#X, (0.2 * avg(l_quantity)
 (60) HashAggregate
 Input [1]: [l_extendedprice#X]
 Keys: []
+Functions [1]: [partial_sum(l_extendedprice#X)]
+Aggregate Attributes [2]: [sum#X, isEmpty#X]
+Results [2]: [sum#X, isEmpty#X]
+
+(61) HashAggregate
+Input [2]: [sum#X, isEmpty#X]
+Keys: []
 Functions [1]: [sum(l_extendedprice#X)]
 Aggregate Attributes [1]: [sum(l_extendedprice#X)#X]
 Results [1]: [(sum(l_extendedprice#X)#X / 7.0) AS avg_yearly#X]
 
-(61) AdaptiveSparkPlan
+(62) AdaptiveSparkPlan
 Output [1]: [avg_yearly#X]
 Arguments: isFinalPlan=true
