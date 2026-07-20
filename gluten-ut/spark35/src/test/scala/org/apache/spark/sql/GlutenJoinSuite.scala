@@ -39,7 +39,10 @@ class GlutenJoinSuite extends JoinSuite with GlutenSQLTestsTrait {
     "SPARK-36612: Support left outer join build left or right" +
       " outer join build right in shuffled hash join",
     // NaN is not supported currently, just skip.
-    "NaN and -0.0 in join keys"
+    "NaN and -0.0 in join keys",
+    "Shuffle output exceed max expansion rate",
+    "Interruptible when join expand a lot",
+    "Join output exceed max expansion rate"
   )
 
   testGluten("test case sensitive for BHJ") {

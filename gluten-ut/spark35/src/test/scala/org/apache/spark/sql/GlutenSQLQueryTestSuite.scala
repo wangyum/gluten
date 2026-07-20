@@ -142,7 +142,14 @@ class GlutenSQLQueryTestSuite
     "ignored.sql", // Do NOT remove this one. It is here to test the ignore functionality.
     "explain-aqe.sql", // Explain is different in Gluten.
     "explain-cbo.sql", // Explain is different in Gluten.
-    "explain.sql" // Explain is different in Gluten.
+    "explain.sql", // Explain is different in Gluten.
+    "column-resolution-aggregate.sql", // Overwrite golden files are outdated for Spark 3.5
+    "identifier-clause.sql", // Overwrite golden files are outdated for Spark 3.5
+    "inline-table.sql", // Overwrite golden files are outdated for Spark 3.5
+    "keywords.sql", // Overwrite golden files are outdated for Spark 3.5
+    "show-create-table.sql", // Overwrite golden files are outdated for Spark 3.5
+    "show-tables.sql", // Overwrite golden files are outdated for Spark 3.5
+    "transform.sql" // Overwrite golden files are outdated for Spark 3.5
   ) ++ otherIgnoreList ++
     BackendTestSettings.instance.getSQLQueryTestSettings.getIgnoredSQLQueryTests
 
