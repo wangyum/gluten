@@ -18,6 +18,7 @@ package org.apache.spark.sql
 
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.execution.{BatchScanExecTransformer, FileSourceScanExecTransformer, FilterExecTransformerBase}
+import org.apache.gluten.expression.VeloxBloomFilterMightContain
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.expressions.{DynamicPruningExpression, Expression}
@@ -71,7 +72,7 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
        """.stripMargin)
 
       val found = df.queryExecution.executedPlan.find {
-        case _ @BroadcastHashJoinExec(_, _, _: ExistenceJoin, _, _, _, _, _) => true
+        case _ @BroadcastHashJoinExec(_, _, _: ExistenceJoin, _, _, _, _, _, _) => true
         case _ => false
       }
 
@@ -157,7 +158,9 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     "SPARK-32509: Unused Dynamic Pruning filter shouldn't affect " +
       "canonicalization and exchange reuse") {
     withSQLConf(SQLConf.DYNAMIC_PARTITION_PRUNING_REUSE_BROADCAST_ONLY.key -> "true") {
-      withSQLConf(SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1") {
+      withSQLConf(
+        SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1",
+        SQLConf.V2_BUCKETING_ENABLED.key -> "false") {
         val df = sql(""" WITH view1 as (
                        |   SELECT f.store_id FROM fact_stats f WHERE f.units_sold = 70
                        | )
@@ -235,12 +238,13 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     val plan = df.queryExecution.executedPlan
     val dpExprs = collectDynamicPruningExpressions(plan)
     val hasSubquery = dpExprs.exists {
-      case InSubqueryExec(_, _: SubqueryExec, _, _, _, _) => true
+      case InSubqueryExec(_, _: SubqueryExec, _, _, _, _, _) => true
+      case _: VeloxBloomFilterMightContain => true
       case _ => false
     }
     val subqueryBroadcast = dpExprs.collect {
-      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) => b
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) => b
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _, _) => b
+      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _, _) => b
     }
 
     val hasFilter = if (withSubquery) "Should" else "Shouldn't"
@@ -293,9 +297,9 @@ abstract class GlutenDynamicPartitionPruningSuiteBase
     df.collect()
 
     val buf = collectDynamicPruningExpressions(df.queryExecution.executedPlan).collect {
-      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) =>
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _, _) =>
         b.index
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) =>
+      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _, _) =>
         b.indices
     }
     assert(buf.distinct.size == n)
