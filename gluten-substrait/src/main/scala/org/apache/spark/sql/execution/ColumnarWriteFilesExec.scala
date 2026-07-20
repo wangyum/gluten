@@ -88,7 +88,8 @@ abstract class ColumnarWriteFilesExec protected (
   protected def writeFilesForEmptyRDD(
       description: WriteJobDescription,
       committer: FileCommitProtocol,
-      jobTrackerID: String): RDD[WriterCommitMessage] = {
+      jobTrackerID: String,
+      writeFilesSpec: WriteFilesSpec): RDD[WriterCommitMessage] = {
     val rddWithNonEmptyPartitions = session.sparkContext.parallelize(Seq.empty[InternalRow], 1)
     rddWithNonEmptyPartitions.mapPartitionsInternal {
       iterator =>
