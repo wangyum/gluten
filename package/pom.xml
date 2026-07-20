@@ -25,7 +25,7 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>gluten-package</artifactId>
+  <artifactId>gluten-package_${scala.binary.version}</artifactId>
   <packaging>jar</packaging>
   <name>Gluten Package</name>
 
@@ -67,7 +67,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <configuration>
-          <finalName>gluten-package-${project.version}</finalName>
+          <finalName>gluten-package_${scala.binary.version}-${project.version}</finalName>
         </configuration>
         <executions>
           <execution>
@@ -167,6 +167,7 @@
                 <filter>
                   <artifact>*:*</artifact>
                   <excludes>
+                    <exclude>META-INF/maven/</exclude>
                     <exclude>META-INF/*.SF</exclude>
                     <exclude>META-INF/*.DSA</exclude>
                     <exclude>META-INF/*.RSA</exclude>
@@ -177,19 +178,12 @@
                     <exclude>NOTICE.txt</exclude>
                     <!--
                       Exclude DefaultAllocationManagerFactory from the shade bundle.
-                      Arrow 16.0.0+'s CheckAllocator inspects the URL of this class
+                      Arrow 18.3.0+'s CheckAllocator inspects the URL of this class
                       and throws "Unknown allocation manager type to infer" if the
                       URL does not contain "memory-core", "memory-unsafe", or
-                      "memory-netty". When the class is bundled inside
-                      gluten-package.jar the URL does not match any of these
-                      patterns (in particular for Arrow <= 15.x where the class
-                      lives at org/apache/arrow/memory/DefaultAllocationManager
-                      Factory.class), breaking allocator initialization whenever
-                      the runtime Arrow version is >= 16.0.0 (e.g. Spark
-                      distributions that ship a newer Arrow than Gluten's
-                      build-time arrow.version). Defer to the upstream
-                      arrow-memory-unsafe / arrow-memory-netty jar which provides
-                      a recognizable URL.
+                      "memory-netty". When bundled inside gluten-package.jar the
+                      URL does not match, so defer to the upstream arrow-memory-*
+                      jar that provides a recognizable URL. See GLUTEN-12225.
                     -->
                     <exclude>org/apache/arrow/memory/DefaultAllocationManagerFactory.class</exclude>
                     <exclude>org/apache/arrow/memory/unsafe/DefaultAllocationManagerFactory.class</exclude>
@@ -220,7 +214,7 @@
             <configuration>
               <executable>cp</executable>
               <arguments>
-                <argument>target/gluten-package-${project.version}.jar</argument>
+                <argument>target/gluten-package_${scala.binary.version}-${project.version}.jar</argument>
                 <argument>target/${jar.assembly.name.prefix}-${backend_type}-bundle-spark${sparkbundle.version}_${scala.binary.version}-${os.full.name}-${project.version}.jar</argument>
               </arguments>
             </configuration>
@@ -360,6 +354,8 @@
         </executions>
       </plugin>
     </plugins>
+    <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
+    <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
   </build>
 
   <profiles>
