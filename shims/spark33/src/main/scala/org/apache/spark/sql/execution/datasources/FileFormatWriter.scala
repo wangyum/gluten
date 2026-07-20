@@ -212,7 +212,8 @@ object FileFormatWriter extends Logging {
       timeZoneId = caseInsensitiveOptions
         .get(DateTimeUtils.TIMEZONE_OPTION)
         .getOrElse(sparkSession.sessionState.conf.sessionLocalTimeZone),
-      statsTrackers = statsTrackers
+      statsTrackers = statsTrackers,
+      maxCreatedFilesPerTask = sparkSession.sessionState.conf.maxCreatedFilesPerTask
     )
 
     // We should first sort by partition columns, then bucket id, and finally sorting columns.

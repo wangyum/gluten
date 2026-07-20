@@ -310,7 +310,9 @@ class VeloxParquetWriteForHiveSuite extends GlutenQueryTest with SQLTestUtils wi
     if (isSparkVersionGE("3.4")) {
       Seq("true", "false").foreach {
         enableConvertMetastore =>
-          withSQLConf("spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
+          withSQLConf(
+            SQLConf.HIVE_BUCKET_WRITE_COMPATIBLE.key -> "true",
+            "spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
             val source = "hive_source_table"
             val target = "hive_bucketed_table"
             withTable(source, target) {
@@ -350,7 +352,9 @@ class VeloxParquetWriteForHiveSuite extends GlutenQueryTest with SQLTestUtils wi
     if (isSparkVersionGE("3.4")) {
       Seq("true", "false").foreach {
         enableConvertMetastore =>
-          withSQLConf("spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
+          withSQLConf(
+            SQLConf.HIVE_BUCKET_WRITE_COMPATIBLE.key -> "true",
+            "spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
             val source = "hive_source_table"
             val target = "hive_bucketed_table"
             withTable(source, target) {
@@ -382,7 +386,9 @@ class VeloxParquetWriteForHiveSuite extends GlutenQueryTest with SQLTestUtils wi
     if (isSparkVersionGE("3.4")) {
       Seq("true", "false").foreach {
         enableConvertMetastore =>
-          withSQLConf("spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
+          withSQLConf(
+            SQLConf.HIVE_BUCKET_WRITE_COMPATIBLE.key -> "true",
+            "spark.sql.hive.convertMetastoreParquet" -> enableConvertMetastore) {
             val source = "hive_source_table"
             val target = "hive_bucketed_table"
             withTable(source, target) {
