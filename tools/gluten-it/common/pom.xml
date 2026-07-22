@@ -46,6 +46,36 @@
       <artifactId>gluten-package_${scala.binary.version}</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!--
+      arrow-memory-core and arrow-memory-unsafe are needed at runtime because
+      the shade plugin in gluten-package excludes DefaultAllocationManagerFactory
+      classes from the bundled jar (see GLUTEN-12225). Arrow's CheckAllocator
+      inspects the URL of this class and throws if it doesn't contain
+      "memory-core", "memory-unsafe", or "memory-netty". The shaded jar's URL
+      doesn't match, so the class must be loaded from these separate jars.
+    -->
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-memory-core</artifactId>
+      <version>${arrow.version}</version>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty-buffer</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>${arrow-memory.artifact}</artifactId>
+      <version>${arrow.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>

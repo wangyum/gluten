@@ -1,0 +1,647 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: eBay Gluten Test (Self-hosted)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ebay_build_test.yml'
+      - '.github/workflows/util/install-spark-deps.sh' #TODO remove after image update
+      - '.github/workflows/util/install-spark-resources.sh' #TODO remove after image update
+      - 'pom.xml'
+      - 'backends-velox/**'
+      - 'gluten-uniffle/**'
+      - 'gluten-celeborn/**'
+      - 'gluten-ras/**'
+      - 'gluten-core/**'
+      - 'gluten-substrait/**'
+      - 'gluten-arrow/**'
+      - 'gluten-delta/**'
+      - 'gluten-iceberg/**'
+      - 'gluten-hudi/**'
+      - 'gluten-paimon/**'
+      - 'gluten-ut/**'
+      - 'package/**'
+      - 'shims/**'
+      - 'tools/gluten-it/**'
+      - 'ep/build-velox/**'
+      - 'cpp/**'
+      - 'dev/**'
+      - 'build/mvn'
+  push:
+    branch:
+      - main
+      - main-ebay*
+      - ebay-build-*
+      - branch-1.7-ebay
+  workflow_run:
+    workflows: ["Auto Rebase Upstream"]
+    types:
+      - completed
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  MVN_CMD: 'build/mvn -ntp'
+  WGET_CMD: 'wget -nv'
+  CCACHE_DIR: "${{ github.workspace }}/.ccache"
+  # spark.sql.ansi.enabled defaults to false.
+  SPARK_ANSI_SQL_MODE: false
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.sha }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build-native-lib-centos-7:
+    if: inputs.native_lib_run_id == ''
+    runs-on: [self-hosted, hadoop]
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+          head -1 ~/.m2/settings.xml | grep -q "<?xml" || { echo "Invalid settings.xml:"; cat ~/.m2/settings.xml; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - name: Get native lib cache
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          restore-keys: native-lib-centos7-
+
+      - name: Get Ccache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-centos7-release-default-${{ github.sha }}
+          restore-keys: |
+            ccache-centos7-release-default
+
+      - name: Build Gluten native libraries
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          # Redirect compiler temp files to workspace (larger disk) to avoid
+          # "No space left on device" errors when /tmp fills up during C++ compilation
+          export TMPDIR="${GITHUB_WORKSPACE}/tmp"
+          mkdir -p "${TMPDIR}"
+          # Install Arrow/Velox deps to workspace (runner has no write access to /usr/local)
+          export INSTALL_PREFIX="${GITHUB_WORKSPACE}/deps-install"
+          mkdir -p "${INSTALL_PREFIX}"
+          export CMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
+          export CCACHE_DIR=${{ env.CCACHE_DIR }}
+          export CCACHE_MAXSIZE=1G
+          mkdir -p ${{ env.CCACHE_DIR }}
+          ccache -sz
+          # Copy build script to avoid modifying the original (its hash is used as the native-lib cache key;
+          # in-place sed would cause save/restore key mismatch and defeat caching on every run)
+          BUILD_SCRIPT="${TMPDIR}/ci-velox-buildstatic-centos-7-enhanced-features.sh"
+          cp dev/ci-velox-buildstatic-centos-7-enhanced-features.sh "${BUILD_SCRIPT}"
+          # Override hardcoded NUM_THREADS in the build script with workflow input
+          sed -i "s/export NUM_THREADS=.*/export NUM_THREADS=${{ inputs.num_threads || '4' }}/" "${BUILD_SCRIPT}"
+          # Skip the socket.h copy: only needed in CentOS 7 Docker, not on Ubuntu runner
+          sed -i 's|cp ep/build-velox/src/socket.h /usr/include/asm-generic/socket.h||' "${BUILD_SCRIPT}"
+          # Ubuntu runner system Arrow lacks libarrow_bundled_dependencies.a;
+          # must build Arrow from source so Gluten CMake finds all required libs
+          sed -i 's/--build_arrow=OFF/--build_arrow=ON/' "${BUILD_SCRIPT}"
+          bash "${BUILD_SCRIPT}"
+          ccache -s
+
+      - name: Save ccache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        id: ccache
+        with:
+          path: '${{ env.CCACHE_DIR }}'
+          key: ccache-centos7-release-default-${{ github.sha }}
+
+      - name: Save native lib cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases/
+          if-no-files-found: error
+
+      - name: Cleanup build artifacts
+        if: always()
+        run: |
+          rm -rf "${GITHUB_WORKSPACE}/tmp" "${GITHUB_WORKSPACE}/deps-install"
+
+  tpc-test-ubuntu:
+    needs: [build-native-lib-centos-7]
+    if: |
+      always() &&
+      (needs.build-native-lib-centos-7.result == 'success' || needs.build-native-lib-centos-7.result == 'skipped')
+    runs-on: [self-hosted, hadoop]
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases/
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if a['name'].startswith('velox-native-lib-')))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+
+      - name: Build and run TPC-H / TPC-DS
+        run: |
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          cd $GITHUB_WORKSPACE/
+          $MVN_CMD clean install -Pspark-3.5 -Pjava-17 -Pbackends-velox -DskipTests
+          cd $GITHUB_WORKSPACE/tools/gluten-it
+          $GITHUB_WORKSPACE/$MVN_CMD clean install -Pspark-3.5 -Pjava-17
+          GLUTEN_IT_JVM_ARGS=-Xmx5G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox --benchmark-type=h --error-on-memleak --off-heap-size=10g -s=1.0 --threads=16 --iterations=1 \
+          && GLUTEN_IT_JVM_ARGS=-Xmx6G sbin/gluten-it.sh queries-compare \
+            --local --preset=velox --benchmark-type=ds --error-on-memleak --off-heap-size=10g -s=1.0 --threads=16 --iterations=1
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/
+
+  spark-test-spark35:
+    needs: [build-native-lib-centos-7]
+    if: |
+      always() &&
+      (needs.build-native-lib-centos-7.result == 'success' || needs.build-native-lib-centos-7.result == 'skipped')
+    runs-on: [self-hosted, hadoop]
+    env:
+      SPARK_TESTING: true
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if 'velox-native-lib' in a['name']))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+      - name: Build and Run unit test for Spark 3.5.5 (other tests)
+        run: |
+          cd $GITHUB_WORKSPACE/
+          export SPARK_SCALA_VERSION=2.12
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.SkipTest
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-report
+          path: '**/surefire-reports/TEST-*.xml'
+      - name: Upload unit tests log files
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-test-log
+          path: |
+            **/target/*.log
+            **/gluten-ut/**/hs_err_*.log
+            **/gluten-ut/**/core.*
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/
+
+  spark-test-spark35-scala213:
+    needs: [build-native-lib-centos-7]
+    runs-on: [self-hosted, hadoop]
+    env:
+      SPARK_TESTING: true
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if 'velox-native-lib' in a['name']))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+      - name: Build and Run unit test for Spark 3.5.5 with scala-2.13 (other tests)
+        run: |
+          cd $GITHUB_WORKSPACE/
+          export SPARK_SCALA_VERSION=2.13
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+          $MVN_CMD clean test -Pspark-3.5 -Pscala-2.13 -Dscala.version=2.13.8 -Pjava-17 -Pbackends-velox -Piceberg \
+          -Pdelta -Pspark-ut -DargLine="-Dspark.test.home=/opt/shims/spark35-scala-2.13/spark_home/" \
+          -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.SkipTest
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-report
+          path: '**/surefire-reports/TEST-*.xml'
+      - name: Upload unit tests log files
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-test-log
+          path: |
+            **/target/*.log
+            **/gluten-ut/**/hs_err_*.log
+            **/gluten-ut/**/core.*
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/
+
+  spark-test-spark35-slow:
+    needs: [build-native-lib-centos-7]
+    if: |
+      always() &&
+      (needs.build-native-lib-centos-7.result == 'success' || needs.build-native-lib-centos-7.result == 'skipped')
+    runs-on: [self-hosted, hadoop]
+    env:
+      SPARK_TESTING: true
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if 'velox-native-lib' in a['name']))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+
+      - name: Build and Run unit test for Spark 3.5.5 (slow tests)
+        run: |
+          cd $GITHUB_WORKSPACE/
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DtagsToInclude=org.apache.spark.tags.ExtendedSQLTest
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DtagsToInclude=org.apache.spark.tags.SlowHiveTest
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-report
+          path: '**/surefire-reports/TEST-*.xml'
+
+      - name: Upload unit tests log files
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-test-log
+          path: |
+            **/target/*.log
+            **/gluten-ut/**/hs_err_*.log
+            **/gluten-ut/**/core.*
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/
+
+  spark-test-spark35-smj:
+    needs: [build-native-lib-centos-7]
+    if: |
+      always() &&
+      (needs.build-native-lib-centos-7.result == 'success' || needs.build-native-lib-centos-7.result == 'skipped')
+    runs-on: [self-hosted, hadoop]
+    env:
+      SPARK_TESTING: true
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if 'velox-native-lib' in a['name']))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+      - name: Build and Run unit test for Spark 3.5.5 (other tests)
+        run: |
+          cd $GITHUB_WORKSPACE/
+          export SPARK_SCALA_VERSION=2.12
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.SkipTest
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-report
+          path: '**/surefire-reports/TEST-*.xml'
+      - name: Upload unit tests log files
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-test-log
+          path: |
+            **/target/*.log
+            **/gluten-ut/**/hs_err_*.log
+            **/gluten-ut/**/core.*
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/
+
+  spark-test-spark35-slow-smj:
+    needs: [build-native-lib-centos-7]
+    if: |
+      always() &&
+      (needs.build-native-lib-centos-7.result == 'success' || needs.build-native-lib-centos-7.result == 'skipped')
+    runs-on: [self-hosted, hadoop]
+    env:
+      SPARK_TESTING: true
+    steps:
+      - name: Maven Settings
+        run: |
+          mkdir -p ~/.m2
+          curl -fsSL \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -o ~/.m2/settings.xml \
+            "https://raw.github.corp.ebay.com/ciaas/JenkinsBuilders/main/raptor/settings.xml"
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: m2-spark35-${{ hashFiles('**/pom.xml') }}
+
+      - name: Get native lib cache
+        id: native-cache
+        if: inputs.native_lib_run_id == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: cpp/build/releases/
+          key: native-lib-centos7-${{ hashFiles('ep/build-velox/src/get-velox.sh', 'dev/ci-velox-buildstatic-centos-7-enhanced-features.sh') }}
+          fail-on-cache-miss: false
+
+      - name: Download Native Lib (fallback)
+        if: inputs.native_lib_run_id == '' && steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: velox-native-lib-centos-7-${{ github.sha }}
+          path: ./cpp/build/releases
+
+      - name: Download Native Lib (reuse)
+        if: inputs.native_lib_run_id != ''
+        run: |
+          mkdir -p cpp/build/releases/
+          ARTIFACT_ID=$(curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/runs/${{ inputs.native_lib_run_id }}/artifacts?per_page=100" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(next(a['id'] for a in d['artifacts'] if 'velox-native-lib' in a['name']))")
+          curl -fsSL \
+            -H "Authorization: token ${{ github.token }}" \
+            "https://github.corp.ebay.com/api/v3/repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o /tmp/native-lib.zip
+          unzip -o /tmp/native-lib.zip -d cpp/build/releases/
+
+      - name: Build and Run unit test for Spark 3.5.5 (slow tests)
+        run: |
+          df -h
+          cd $GITHUB_WORKSPACE/
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+          export MAVEN_OPTS="-Xss128m -Xmx8g -XX:ReservedCodeCacheSize=2g"
+          java -version
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DtagsToInclude=org.apache.spark.tags.ExtendedSQLTest
+          $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
+          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DtagsToInclude=org.apache.spark.tags.SlowHiveTest
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-report
+          path: '**/surefire-reports/TEST-*.xml'
+      - name: Upload unit tests log files
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.job }}-test-log
+          path: |
+            **/target/*.log
+            **/gluten-ut/**/hs_err_*.log
+            **/gluten-ut/**/core.*
+      - name: Cleanup
+        if: always()
+        run: rm -rf cpp/build/releases/ */target/ */*/target/

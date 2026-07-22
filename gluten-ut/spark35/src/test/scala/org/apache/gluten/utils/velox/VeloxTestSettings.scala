@@ -901,6 +901,10 @@ class VeloxTestSettings extends BackendTestSettings {
     .excludeByPrefix("range join")
     .excludeByPrefix("HADP-34781: Clean up the staging output path of last attempt")
     .exclude("HADP-40670 HADP-42732: Limit max files be created per task")
+    // eBay-internal Spark configs (spark.carmel.*) are not enforced in the ETL Spark build
+    // used in CI, so these tests fail with unexpected behavior.
+    .exclude("Disable insert into path sql")
+    .exclude("Check fast fail of cube expression length")
   enableSuite[GlutenSQLQueryTestSuite]
   enableSuite[GlutenStatisticsCollectionSuite]
     // The output byte size of Velox is different
@@ -950,6 +954,11 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenPruningSuite]
   enableSuite[GlutenSQLMetricsSuite]
   enableSuite[org.apache.spark.sql.hive.execution.GlutenSQLQuerySuite]
+    // Runner filesystem does not support unicode partition paths (InvalidPathException).
+    .exclude("create Hive-serde table and view with unicode columns and comment")
+    // eBay-internal config spark.carmel.sql.view.alignOutputWithSubquery is not enforced
+    // in the ETL Spark build used in CI, causing CANNOT_UP_CAST_DATATYPE errors.
+    .exclude("resolve and align view when the dataTypes of referenced table columns changed")
   enableSuite[GlutenHashUDAQuerySuite]
   enableSuite[GlutenHashUDAQueryWithControlledFallbackSuite]
   enableSuite[GlutenSQLQuerySuiteAE]

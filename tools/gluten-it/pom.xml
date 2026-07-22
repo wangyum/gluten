@@ -43,6 +43,8 @@
     <gluten.version>1.7.0-SNAPSHOT</gluten.version>
     <tpch.version>1.1</tpch.version>
     <tpcds.version>1.4</tpcds.version>
+    <arrow.version>15.0.0</arrow.version>
+    <arrow-memory.artifact>arrow-memory-unsafe</arrow-memory.artifact>
 
     <spotless.version>2.27.2</spotless.version>
     <googlejavaformat.version>1.7</googlejavaformat.version>
@@ -325,6 +327,7 @@
         <scala.binary.version>2.13</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>4.0.0</delta.version>
+        <arrow.version>18.1.0</arrow.version>
       </properties>
     </profile>
     <profile>
@@ -335,6 +338,7 @@
         <scala.binary.version>2.13</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>4.0.0</delta.version>
+        <arrow.version>18.1.0</arrow.version>
       </properties>
     </profile>
     <profile>
@@ -347,6 +351,15 @@
       <id>celeborn-0.6</id>
       <properties>
         <celeborn.version>0.6.3</celeborn.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>arrow-netty</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <arrow-memory.artifact>arrow-memory-netty</arrow-memory.artifact>
       </properties>
     </profile>
   </profiles>
