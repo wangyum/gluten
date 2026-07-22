@@ -932,6 +932,11 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("udaf with all data types")
   enableSuite[GlutenHiveCommandSuite]
   enableSuite[GlutenHiveDDLSuite]
+    // Runner filesystem does not support unicode partition paths (InvalidPathException).
+    .exclude("create Hive-serde table and view with unicode columns and comment")
+    // eBay-internal config spark.carmel.sql.view.alignOutputWithSubquery is not enforced
+    // in the ETL Spark build used in CI, causing CANNOT_UP_CAST_DATATYPE errors.
+    .exclude("resolve and align view when the dataTypes of referenced table columns changed")
   enableSuite[GlutenHiveExplainSuite]
     .exclude("explain output of physical plan should contain proper codegen stage ID")
     .exclude("EXPLAIN CODEGEN command")
@@ -942,6 +947,11 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenHiveResolutionSuite]
   enableSuite[GlutenHiveSQLQuerySuite]
   enableSuite[GlutenHiveSQLViewSuite]
+    // Runner filesystem does not support unicode partition paths (InvalidPathException).
+    .exclude("create Hive-serde table and view with unicode columns and comment")
+    // eBay-internal config spark.carmel.sql.view.alignOutputWithSubquery is not enforced
+    // in the ETL Spark build used in CI, causing CANNOT_UP_CAST_DATATYPE errors.
+    .exclude("resolve and align view when the dataTypes of referenced table columns changed")
   enableSuite[GlutenHiveScriptTransformationSuite]
   enableSuite[GlutenHiveSerDeReadWriteSuite]
   enableSuite[GlutenHiveSerDeSuite]
