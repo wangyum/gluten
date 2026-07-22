@@ -210,6 +210,7 @@ jobs:
       - name: Build and run TPC-H / TPC-DS
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           cd $GITHUB_WORKSPACE/
           $MVN_CMD clean install -Pspark-3.5 -Pjava-17 -Pbackends-velox -DskipTests
           cd $GITHUB_WORKSPACE/tools/gluten-it
@@ -284,6 +285,7 @@ jobs:
           export SPARK_SCALA_VERSION=2.12
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
           -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
@@ -365,6 +367,7 @@ jobs:
           export SPARK_SCALA_VERSION=2.13
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pscala-2.13 -Dscala.version=2.13.8 -Pjava-17 -Pbackends-velox -Piceberg \
           -Pdelta -Pspark-ut -DargLine="-Dspark.test.home=/opt/shims/spark35-scala-2.13/spark_home/" \
@@ -449,6 +452,7 @@ jobs:
           cd $GITHUB_WORKSPACE/
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
           -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
@@ -537,6 +541,7 @@ jobs:
           export SPARK_SCALA_VERSION=2.12
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
           -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
@@ -620,7 +625,7 @@ jobs:
           cd $GITHUB_WORKSPACE/
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH=$JAVA_HOME/bin:$PATH
-          export MAVEN_OPTS="-Xss128m -Xmx8g -XX:ReservedCodeCacheSize=2g"
+          export MAVEN_OPTS="-Xss128m -Xmx12g -XX:ReservedCodeCacheSize=2g"
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
           -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
