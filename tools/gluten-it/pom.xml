@@ -43,6 +43,9 @@
     <gluten.version>1.8.0-SNAPSHOT</gluten.version>
     <tpch.version>1.1</tpch.version>
     <tpcds.version>1.4</tpcds.version>
+    <arrow.version>15.0.0</arrow.version>
+    <arrow-memory.artifact>arrow-memory-unsafe</arrow-memory.artifact>
+    <spark.arrow.exclusion.groupId>org.apache.arrow</spark.arrow.exclusion.groupId>
 
     <spotless.version>2.27.2</spotless.version>
     <googlejavaformat.version>1.7</googlejavaformat.version>
@@ -97,7 +100,7 @@
             <artifactId>avro</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.arrow</groupId>
+            <groupId>${spark.arrow.exclusion.groupId}</groupId>
             <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
@@ -113,7 +116,7 @@
         <version>${spark.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>org.apache.arrow</groupId>
+            <groupId>${spark.arrow.exclusion.groupId}</groupId>
             <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
@@ -156,7 +159,7 @@
             <artifactId>protobuf-java</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.arrow</groupId>
+            <groupId>${spark.arrow.exclusion.groupId}</groupId>
             <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
@@ -171,6 +174,12 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
         <version>1.7.30</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>${arrow-memory.artifact}</artifactId>
+        <version>${arrow.version}</version>
+        <scope>runtime</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -339,6 +348,9 @@
         <scala.binary.version>2.13</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>4.0.0</delta.version>
+        <arrow.version>18.1.0</arrow.version>
+        <arrow-memory.artifact>arrow-memory-netty</arrow-memory.artifact>
+        <spark.arrow.exclusion.groupId>none</spark.arrow.exclusion.groupId>
       </properties>
     </profile>
     <profile>
@@ -349,6 +361,9 @@
         <scala.binary.version>2.13</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>4.0.0</delta.version>
+        <arrow.version>18.3.0</arrow.version>
+        <arrow-memory.artifact>arrow-memory-netty</arrow-memory.artifact>
+        <spark.arrow.exclusion.groupId>none</spark.arrow.exclusion.groupId>
       </properties>
     </profile>
     <profile>
