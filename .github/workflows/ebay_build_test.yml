@@ -59,6 +59,8 @@ env:
   # spark.sql.ansi.enabled defaults to false.
   SPARK_ANSI_SQL_MODE: false
   M2_REPOSITORY: '/root/.m2/repository/'
+  TEST_SPARK_HOME: '/opt/shims/spark35/spark_home/'
+  TEST_SPARK213_HOME: '/opt/shims/spark35-scala-2.13/spark_home/'
 
 concurrency:
   group: ${{ github.repository }}-${{ github.head_ref || github.sha }}-${{ github.workflow }}
@@ -116,6 +118,22 @@ jobs:
           key: m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             m2-
+      - name: Restore scala2.12-jars cache
+        id: scala212cache
+        uses: actions/cache/restore@v4
+        with:
+          path: spark-3.5.*-SNAPSHOT-bin-2.12/jars
+          key: scala2.12-jars-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            scala2.12-jars-
+      - name: Restore scala2.13-jars cache
+        id: scala213cache
+        uses: actions/cache/restore@v4
+        with:
+          path: spark-3.5.*-SNAPSHOT-bin-2.13/jars
+          key: scala2.13-jars-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            scala2.13-jars-
       - name: Checkout packages repo
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         uses: actions/checkout@v4
@@ -132,7 +150,7 @@ jobs:
           mv org /home/runner/.m2/repository/
           cd /home/runner/.m2/repository && find . -name "_*.repositories" | xargs rm -rf
       - name: Checkout ebay-spark repo
-        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        if: ${{ !steps.m2cache.outputs.cache-hit || !steps.scala212cache.outputs.cache-hit || !steps.scala213cache.outputs.cache-hit }}
         uses: actions/checkout@v4
         with:
           repository: wangyum/ebay-spark
@@ -154,6 +172,42 @@ jobs:
         with:
           name: m2-dependency-${{ github.sha }}
           path: /home/runner/.m2/repository
+          if-no-files-found: error
+      - name: Prepare ebay-spark 2.12 jars
+        if: ${{ !steps.scala212cache.outputs.cache-hit }}
+        run: |
+          rm -rf spark-3.5.*.tgz
+          ./dev/change-scala-version.sh 2.12
+          ./dev/make-distribution.sh --name 2.12 --tgz -Pscala-2.12 -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
+          tar -zxf spark-3.5.*-SNAPSHOT-bin-2.12.tgz
+      - name: Save scala2.12-jars cache
+        if: ${{ !steps.scala212cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: spark-3.5.*-SNAPSHOT-bin-2.12/jars
+          key: scala2.12-jars-${{ hashFiles('**/pom.xml') }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: spark-3.5.*-SNAPSHOT-bin-2.12/jars
+          if-no-files-found: error
+      - name: Prepare ebay-spark 2.13 jars
+        if: ${{ !steps.scala213cache.outputs.cache-hit }}
+        run: |
+          rm -rf spark-3.5.*.tgz
+          ./dev/change-scala-version.sh 2.13
+          ./dev/make-distribution.sh --name 2.13 --tgz -Pscala-2.13 -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
+          tar -zxf spark-3.5.*-SNAPSHOT-bin-2.13.tgz
+      - name: Save scala2.13-jars cache
+        if: ${{ !steps.scala213cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: spark-3.5.*-SNAPSHOT-bin-2.13/jars
+          key: scala2.13-jars-${{ hashFiles('**/pom.xml') }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: spark-3.5.*-SNAPSHOT-bin-2.13/jars
           if-no-files-found: error
 
   tpc-test-ubuntu:
@@ -260,6 +314,7 @@ jobs:
             --extra-conf=spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
           fi
 
+
   spark-test-spark35:
     needs: [build-native-lib-centos-7, build-internal-dependency]
     runs-on: ubuntu-22.04
@@ -278,6 +333,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -287,6 +356,9 @@ jobs:
           pip3 install pandas==2.2.3 pyarrow==20.0.0
       - name: Build and Run unit test for Spark 3.5.5 (other tests)
         run: |
+          ls -lR ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
+          echo "scala-2.13"
+          ls -lR ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
           cd $GITHUB_WORKSPACE/
           export SPARK_SCALA_VERSION=2.12
           yum install -y java-17-openjdk-devel
@@ -294,7 +366,7 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME}" \
           -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest
       - name: Upload test report
         if: always()
@@ -336,6 +408,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -352,7 +438,7 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pscala-2.13 -Dscala.version=2.13.8 -Pjava-17 -Pbackends-velox -Piceberg \
-          -Pdelta -Pspark-ut -DargLine="-Dspark.test.home=/opt/shims/spark35-scala-2.13/spark_home/" \
+          -Pdelta -Pspark-ut -DargLine="-Dspark.test.home=${TEST_SPARK213_HOME}/" \
           -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest
       - name: Upload test report
         if: always()
@@ -369,6 +455,7 @@ jobs:
             **/target/*.log
             **/gluten-ut/**/hs_err_*.log
             **/gluten-ut/**/core.*
+
 
   spark-test-spark35-slow:
     needs: [build-native-lib-centos-7, build-internal-dependency]
@@ -390,6 +477,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare Spark Resources for Spark 3.5.5 #TODO remove after image update
         run: |
           rm -rf /opt/shims/spark35
@@ -402,10 +503,10 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME}" \
           -DtagsToInclude=org.apache.spark.tags.ExtendedSQLTest
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME}" \
           -DtagsToInclude=org.apache.spark.tags.SlowHiveTest
       - name: Upload test report
         if: always()
@@ -422,6 +523,7 @@ jobs:
             **/target/*.log
             **/gluten-ut/**/hs_err_*.log
             **/gluten-ut/**/core.*
+
 
   spark-test-spark35-smj:
     needs: [build-native-lib-centos-7, build-internal-dependency]
@@ -441,6 +543,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -457,7 +573,7 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME} -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
           -DtagsToExclude=org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest
       - name: Upload test report
         uses: actions/upload-artifact@v4
@@ -473,6 +589,7 @@ jobs:
             **/target/*.log
             **/gluten-ut/**/hs_err_*.log
             **/gluten-ut/**/core.*
+
 
   spark-test-spark35-slow-smj:
     needs: [build-native-lib-centos-7, build-internal-dependency]
@@ -494,6 +611,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare Spark Resources for Spark 3.5.5 #TODO remove after image update
         run: |
           rm -rf /opt/shims/spark35
@@ -506,10 +637,10 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME} -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
           -DtagsToInclude=org.apache.spark.tags.ExtendedSQLTest
           $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Ppaimon -Pspark-ut \
-          -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/ -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
+          -DargLine="-Dspark.test.home=${TEST_SPARK_HOME} -Dspark.gluten.sql.columnar.forceShuffledHashJoin=false" \
           -DtagsToInclude=org.apache.spark.tags.SlowHiveTest
       - name: Upload test report
         uses: actions/upload-artifact@v4
@@ -525,6 +656,7 @@ jobs:
             **/target/*.log
             **/gluten-ut/**/hs_err_*.log
             **/gluten-ut/**/core.*
+
 
   tpc-test-ubuntu-2204-celeborn:
     needs: [build-native-lib-centos-7, build-internal-dependency]
@@ -547,6 +679,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup Java and Maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
@@ -605,6 +751,7 @@ jobs:
             --extra-conf=spark.celeborn.push.sortMemory.threshold=8m --benchmark-type=ds --error-on-memleak \
             --off-heap-size=10g -s=1.0 --threads=8 --iterations=1
 
+
   build-and-deploy-bundle-package-centos8:
     if: ${{ contains(github.ref, 'release') }}
     needs: [build-native-lib-centos-7, build-internal-dependency]
@@ -630,6 +777,20 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark jars
+        run: |
+          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/* && \
+          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+      - name: Replace Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
+      - name: Replace Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup Java and Maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*

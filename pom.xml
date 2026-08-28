@@ -219,7 +219,7 @@
         <exclusions>
           <exclusion>
             <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>arrow-vector</artifactId>
+            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.slf4j</groupId>
@@ -285,6 +285,10 @@
         <version>${spark.version}</version>
         <scope>provided</scope>
         <exclusions>
+          <exclusion>
+            <groupId>${spark.arrow.exclusion.groupId}</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
@@ -1263,6 +1267,7 @@
         <delta.version>3.3.3-ebay.20260715</delta.version>
         <delta.binary.version>33</delta.binary.version>
         <hudi.version>0.15.0</hudi.version>
+        <arrow.version>18.3.0</arrow.version>
         <fasterxml.version>2.15.1</fasterxml.version>
         <hadoop.version>3.3.3.2.0.11</hadoop.version>
         <antlr4.version>4.9.3</antlr4.version>
