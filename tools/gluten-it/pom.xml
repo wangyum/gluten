@@ -43,9 +43,6 @@
     <gluten.version>1.8.0-SNAPSHOT</gluten.version>
     <tpch.version>1.1</tpch.version>
     <tpcds.version>1.4</tpcds.version>
-    <arrow.version>15.0.0</arrow.version>
-    <arrow-memory.artifact>arrow-memory-unsafe</arrow-memory.artifact>
-    <spark.arrow.exclusion.groupId>org.apache.arrow</spark.arrow.exclusion.groupId>
 
     <spotless.version>2.27.2</spotless.version>
     <googlejavaformat.version>1.7</googlejavaformat.version>
@@ -99,10 +96,6 @@
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -114,12 +107,6 @@
         <groupId>org.apache.spark</groupId>
         <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
         <version>${spark.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.spark</groupId>
@@ -158,10 +145,6 @@
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -174,22 +157,6 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
         <version>1.7.30</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.arrow</groupId>
-        <artifactId>${arrow-memory.artifact}</artifactId>
-        <version>${arrow.version}</version>
-        <scope>runtime</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-common</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-buffer</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -338,6 +305,7 @@
         <scala.binary.version>2.12</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>3.3.3-ebay.20260716</delta.version>
+        <arrow.version>18.3.0</arrow.version>
       </properties>
     </profile>
     <profile>
