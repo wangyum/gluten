@@ -347,10 +347,7 @@
         <scala.version>2.13.17</scala.version>
         <scala.binary.version>2.13</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
-        <delta.version>4.0.0</delta.version>
-        <arrow.version>18.1.0</arrow.version>
-        <arrow-memory.artifact>arrow-memory-netty</arrow-memory.artifact>
-        <spark.arrow.exclusion.groupId>none</spark.arrow.exclusion.groupId>
+        <delta.version>4.0.1</delta.version>
       </properties>
     </profile>
     <profile>
@@ -359,11 +356,8 @@
         <spark.version>4.1.1</spark.version>
         <scala.version>2.13.17</scala.version>
         <scala.binary.version>2.13</scala.binary.version>
-        <delta.package.name>delta-spark</delta.package.name>
-        <delta.version>4.0.0</delta.version>
-        <arrow.version>18.3.0</arrow.version>
-        <arrow-memory.artifact>arrow-memory-netty</arrow-memory.artifact>
-        <spark.arrow.exclusion.groupId>none</spark.arrow.exclusion.groupId>
+        <delta.package.name>delta-spark_4.1</delta.package.name>
+        <delta.version>4.1.0</delta.version>
       </properties>
     </profile>
     <profile>
