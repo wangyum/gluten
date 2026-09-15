@@ -33,6 +33,19 @@ class GlutenLocalBroadcastExchangeSuite
 
   def newSparkConf(): SparkConf = {
     val conf = new SparkConf().setMaster("local-cluster[2,1,1024]")
+    // Local-cluster executors are separate JVM processes launched by the worker and
+    // do not inherit the surefire argLine of the driver. With Gluten's bundled
+    // arrow-memory-unsafe, Arrow's MemoryUtil class-init requires
+    // --add-opens=java.base/java.nio on JDK 17+, otherwise ArrowBufferAllocators
+    // class-init fails on executors with ExceptionInInitializerError.
+    // (-XX:+IgnoreUnrecognizedVMOptions keeps this harmless on Java 8/11.)
+    conf.set(
+      "spark.executor.extraJavaOptions",
+      "-XX:+IgnoreUnrecognizedVMOptions" +
+        " --add-opens=java.base/java.nio=ALL-UNNAMED" +
+        " --add-opens=java.base/sun.nio.ch=ALL-UNNAMED" +
+        " -Dio.netty.tryReflectionSetAccessible=true"
+    )
     GlutenSQLTestsBaseTrait.nativeSparkConf(conf, warehouse)
   }
 
