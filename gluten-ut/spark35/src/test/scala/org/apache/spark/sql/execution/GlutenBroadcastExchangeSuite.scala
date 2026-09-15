@@ -33,19 +33,19 @@ class GlutenLocalBroadcastExchangeSuite
 
   def newSparkConf(): SparkConf = {
     val conf = new SparkConf().setMaster("local-cluster[2,1,1024]")
-    // Local-cluster executors are separate JVM processes launched by the worker and
-    // do not inherit the surefire argLine of the driver. With Gluten's bundled
-    // arrow-memory-unsafe, Arrow's MemoryUtil class-init requires
-    // --add-opens=java.base/java.nio on JDK 17+, otherwise ArrowBufferAllocators
-    // class-init fails on executors with ExceptionInInitializerError.
-    // (-XX:+IgnoreUnrecognizedVMOptions keeps this harmless on Java 8/11.)
-    conf.set(
-      "spark.executor.extraJavaOptions",
-      "-XX:+IgnoreUnrecognizedVMOptions" +
-        " --add-opens=java.base/java.nio=ALL-UNNAMED" +
-        " --add-opens=java.base/sun.nio.ch=ALL-UNNAMED" +
-        " -Dio.netty.tryReflectionSetAccessible=true"
-    )
+    // Local-cluster executors are separate JVMs whose classpath puts the driver's
+    // classpath ahead of the spark.test.home distribution jars. The Spark 3.5
+    // distribution bundles Arrow 12.0.1, whose arrow-memory-netty jar still carries
+    // the legacy org/apache/arrow/memory/DefaultAllocationManagerFactory.class
+    // resource. Arrow 18's CheckAllocator picks that legacy resource first and maps
+    // the jar name to the new-style
+    // org.apache.arrow.memory.netty.DefaultAllocationManagerFactory, which exists
+    // nowhere on this classpath (Gluten bundles arrow-memory-unsafe only), so
+    // ArrowBufferAllocators class-init fails on executors with
+    // ExceptionInInitializerError. Pin the unsafe allocator to skip the classpath
+    // scan. (SparkContext.supplementJavaModuleOptions already supplements
+    // spark.executor.extraJavaOptions with the required --add-opens.)
+    conf.set("spark.executor.extraJavaOptions", "-Darrow.allocation.manager.type=Unsafe")
     GlutenSQLTestsBaseTrait.nativeSparkConf(conf, warehouse)
   }
 
