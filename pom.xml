@@ -219,7 +219,7 @@
         <exclusions>
           <exclusion>
             <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
+            <artifactId>arrow-vector</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.slf4j</groupId>
@@ -285,10 +285,6 @@
         <version>${spark.version}</version>
         <scope>provided</scope>
         <exclusions>
-          <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client</artifactId>
