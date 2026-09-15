@@ -305,7 +305,6 @@
         <scala.binary.version>2.12</scala.binary.version>
         <delta.package.name>delta-spark</delta.package.name>
         <delta.version>3.3.3-ebay.20260716</delta.version>
-        <arrow.version>18.3.0</arrow.version>
       </properties>
     </profile>
     <profile>
