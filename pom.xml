@@ -258,10 +258,6 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-client-runtime</artifactId>
           </exclusion>
@@ -407,12 +403,6 @@
         <version>${spark.version}</version>
         <type>test-jar</type>
         <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>${spark.arrow.exclusion.groupId}</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.spark</groupId>
