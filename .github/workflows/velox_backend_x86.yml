@@ -812,6 +812,12 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           export SPARK_HOME=/opt/shims/spark34/spark_home/
+          # Remove the Arrow jars bundled with this Spark distribution: they are an
+          # older version than gluten's own arrow.version and, when both land on the
+          # same test JVM classpath, break org.apache.arrow.memory.AllocationManager's
+          # classpath-based allocator detection (ClassNotFoundException on
+          # DefaultAllocationManagerFactory).
+          rm -f $SPARK_HOME/assembly/target/scala-*/jars/arrow-*.jar
           TAGS_EXCLUDE="org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest"
           if [ "${{ matrix.group }}" = "1" ]; then
             $MVN_CMD clean test -Pspark-3.4 -Pjava-17 -Pbackends-velox -Piceberg -Piceberg-test -Pdelta -Phudi -Ppaimon -Pspark-ut \
@@ -875,6 +881,7 @@ jobs:
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
           export SPARK_HOME=/opt/shims/spark34/spark_home/
+          rm -f $SPARK_HOME/assembly/target/scala-*/jars/arrow-*.jar
           if [ "${{ matrix.suite }}" = "extended" ]; then
             $MVN_CMD clean test -Pspark-3.4 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
             -DtagsToInclude=org.apache.spark.tags.ExtendedSQLTest \
@@ -936,6 +943,12 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
+          # Remove the Arrow jars bundled with this Spark distribution: they are an
+          # older version than gluten's own arrow.version and, when both land on the
+          # same test JVM classpath, break org.apache.arrow.memory.AllocationManager's
+          # classpath-based allocator detection (ClassNotFoundException on
+          # DefaultAllocationManagerFactory).
+          rm -f /opt/shims/spark35/spark_home/assembly/target/scala-*/jars/arrow-*.jar
           TAGS_EXCLUDE="org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest"
           if [ "${{ matrix.group }}" = "1" ]; then
             $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
@@ -1008,6 +1021,12 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
+          # Remove the Arrow jars bundled with this Spark distribution: they are an
+          # older version than gluten's own arrow.version and, when both land on the
+          # same test JVM classpath, break org.apache.arrow.memory.AllocationManager's
+          # classpath-based allocator detection (ClassNotFoundException on
+          # DefaultAllocationManagerFactory).
+          rm -f /opt/shims/spark35-scala-2.13/spark_home/assembly/target/scala-*/jars/arrow-*.jar
           TAGS_EXCLUDE="org.apache.spark.tags.ExtendedSQLTest,org.apache.spark.tags.SlowHiveTest,org.apache.gluten.tags.UDFTest,org.apache.gluten.tags.EnhancedFeaturesTest,org.apache.gluten.tags.CudfTest,org.apache.gluten.tags.SkipTest"
           if [ "${{ matrix.group }}" = "1" ]; then
             $MVN_CMD clean test -Pspark-3.5 -Pscala-2.13 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Pspark-ut \
@@ -1066,6 +1085,7 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
+          rm -f /opt/shims/spark35/spark_home/assembly/target/scala-*/jars/arrow-*.jar
           if [ "${{ matrix.suite }}" = "extended" ]; then
             $MVN_CMD clean test -Pspark-3.5 -Pjava-17 -Pbackends-velox -Piceberg -Pdelta -Phudi -Ppaimon -Pspark-ut \
             -DargLine="-Dspark.test.home=/opt/shims/spark35/spark_home/" \
@@ -1181,6 +1201,7 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
           export PATH=$JAVA_HOME/bin:$PATH
           java -version
+          rm -f /opt/shims/spark35/spark_home/assembly/target/scala-*/jars/arrow-*.jar
           # Depends on --build_example=ON.
           $MVN_CMD test -Pspark-3.5 -Pbackends-velox -Pjava-17 -Piceberg -Pdelta -Ppaimon -DtagsToExclude=org.apache.gluten.tags.EnhancedFeaturesTest \
           -DtagsToInclude=org.apache.gluten.tags.UDFTest \
