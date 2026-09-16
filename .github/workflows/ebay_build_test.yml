@@ -145,7 +145,7 @@ jobs:
           ./dev/make-distribution.sh --name carmel-spark --tgz -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
           ./dev/change-scala-version.sh 2.13
           build/mvn clean install -Pscala-2.13 -DskipTests=true -Dmaven.javadoc.skip=true
-          ./dev/make-distribution.sh --name carmel-spark --tgz -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
+          ./dev/make-distribution.sh --name carmel-spark --tgz -Pscala-2.13 -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
           tar -zxf spark-3.5.*.tgz
       - name: Save Maven cache
         if: ${{ !steps.m2cache.outputs.cache-hit }}
