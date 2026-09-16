@@ -287,6 +287,10 @@ jobs:
           pip3 install pandas==2.2.3 pyarrow==20.0.0
       - name: Build and Run unit test for Spark 3.5.5 (other tests)
         run: |
+          echo "before: /opt/shims/spark35/spark_home/"
+          ls -R /opt/shims/spark35/spark_home/
+          ls -R /opt/shims/spark35-scala-2.13/spark_home/
+          echo "end: /opt/shims/spark35/spark_home/"
           cd $GITHUB_WORKSPACE/
           export SPARK_SCALA_VERSION=2.12
           yum install -y java-17-openjdk-devel
