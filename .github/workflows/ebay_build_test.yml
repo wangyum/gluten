@@ -160,25 +160,49 @@ jobs:
           name: m2-dependency-${{ github.sha }}
           path: /home/runner/.m2/repository
           if-no-files-found: error
+      - name: Restore scala2.12-jars cache
+        id: scala212cache
+        uses: actions/cache/restore@v4
+        with:
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
+          key: scala2.12-jars-${{ github.sha }}
       - name: Prepare ebay-spark 2.12 jars
-        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        if: ${{ !steps.scala212cache.outputs.cache-hit }}
         run: |
           rm -rf spark-3.5.*.tgz
           ./dev/change-scala-version.sh 2.12
           ./dev/make-distribution.sh --name carmel-spark --tgz -Pscala-2.12 -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
           tar -zxf spark-3.5.*.tgz
+      - name: Save scala2.12-jars cache
+        if: ${{ !steps.scala212cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
+          key: scala2.12-jars-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
           path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
           if-no-files-found: error
+      - name: Restore scala2.13-jars cache
+        id: scala213cache
+        uses: actions/cache/restore@v4
+        with:
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
+          key: scala2.13-jars-${{ github.sha }}
       - name: Prepare ebay-spark 2.13 jars
-        if: ${{ !steps.m2cache.outputs.cache-hit }}
+        if: ${{ !steps.scala213cache.outputs.cache-hit }}
         run: |
-          rm -rf spark-3.5.*.tgz
+          rm -rf spark-3.5.*.tgz spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark
           ./dev/change-scala-version.sh 2.13
           ./dev/make-distribution.sh --name carmel-spark --tgz -Pscala-2.13 -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
           tar -zxf spark-3.5.*.tgz
+      - name: Save scala2.13-jars cache
+        if: ${{ !steps.scala213cache.outputs.cache-hit }}
+        uses: actions/cache/save@v4
+        with:
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
+          key: scala2.13-jars-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
