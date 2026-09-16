@@ -142,8 +142,11 @@ jobs:
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         run: |
           build/mvn clean install -DskipTests=true -Dmaven.javadoc.skip=true
+          ./dev/make-distribution.sh --name carmel-spark --tgz -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
           ./dev/change-scala-version.sh 2.13
           build/mvn clean install -Pscala-2.13 -DskipTests=true -Dmaven.javadoc.skip=true
+          ./dev/make-distribution.sh --name carmel-spark --tgz -Phadoop-3 -Phive -Phive-thriftserver -Pyarn -Dcluster=etl
+          tar -zxf spark-3.5.*.tgz
       - name: Save Maven cache
         if: ${{ !steps.m2cache.outputs.cache-hit }}
         uses: actions/cache/save@v4
@@ -154,6 +157,16 @@ jobs:
         with:
           name: m2-dependency-${{ github.sha }}
           path: /home/runner/.m2/repository
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark/jars
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: spark-3.5.*-ebay.0-SNAPSHOT-bin-carmel-spark*2.13/jars
           if-no-files-found: error
 
   tpc-test-ubuntu:
@@ -278,6 +291,16 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
+      - name: Remove Spark 2.12 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.12-jars-${{ github.sha }}
+          path: /opt/shims/spark35/spark_home/assembly/target/scala-2.12/jars/
+      - name: Remove Spark 2.13 jars
+        uses: actions/download-artifact@v4
+        with:
+          name: scala2.13-jars-${{ github.sha }}
+          path: /opt/shims/spark35-scala-2.13/spark_home/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
