@@ -378,7 +378,7 @@ jobs:
           pip3 install pandas==2.2.3 pyarrow==20.0.0
       - name: Build and Run unit test for Spark 3.5.5 (other tests)
         run: |
-          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/
+          ls -lR ${TEST_SPARK_HOME}assembly/target/scala-2.12/
           ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
           cd $GITHUB_WORKSPACE/
           export SPARK_SCALA_VERSION=2.12
