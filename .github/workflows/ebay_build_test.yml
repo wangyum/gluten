@@ -252,6 +252,7 @@ jobs:
           path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
       - name: Setup tzdata
         run: |
+          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/
           ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
           echo "scala-2.13"
           ls -R ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
