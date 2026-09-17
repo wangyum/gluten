@@ -245,12 +245,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup tzdata
         run: |
           ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/
@@ -363,12 +363,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -437,12 +437,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -506,12 +506,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare Spark Resources for Spark 3.5.5 #TODO remove after image update
         run: |
           rm -rf /opt/shims/spark35
@@ -572,12 +572,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare
         run: |
           dnf module -y install python39 && \
@@ -640,12 +640,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Prepare Spark Resources for Spark 3.5.5 #TODO remove after image update
         run: |
           rm -rf /opt/shims/spark35
@@ -708,12 +708,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup Java and Maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
@@ -806,12 +806,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scala2.12-jars-${{ github.sha }}
-          path: ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
+          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
       - name: Replace Spark 2.13 jars
         uses: actions/download-artifact@v4
         with:
           name: scala2.13-jars-${{ github.sha }}
-          path: ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
+          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup Java and Maven
         run: |
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
