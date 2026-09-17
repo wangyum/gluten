@@ -236,27 +236,8 @@ jobs:
         with:
           name: m2-dependency-${{github.sha}}
           path: /root/.m2/repository
-      - name: Remove Spark jars
-        run: |
-          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/
-          rm -rf ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
-          rm -rf ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
-      - name: Replace Spark 2.12 jars
-        uses: actions/download-artifact@v4
-        with:
-          name: scala2.12-jars-${{ github.sha }}
-          path: ${{ env.TEST_SPARK_HOME }}assembly/target/scala-2.12/jars/
-      - name: Replace Spark 2.13 jars
-        uses: actions/download-artifact@v4
-        with:
-          name: scala2.13-jars-${{ github.sha }}
-          path: ${{ env.TEST_SPARK213_HOME }}/assembly/target/scala-2.13/jars/
       - name: Setup tzdata
         run: |
-          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/
-          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
-          echo "scala-2.13"
-          ls -R ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
           sed -i 's|http://archive|http://eu.archive|g' /etc/apt/sources.list
           if [ "${{ matrix.os }}" = "ubuntu:22.04" ]; then
             apt-get update
@@ -378,8 +359,6 @@ jobs:
           pip3 install pandas==2.2.3 pyarrow==20.0.0
       - name: Build and Run unit test for Spark 3.5.5 (other tests)
         run: |
-          ls -lR ${TEST_SPARK_HOME}assembly/target/scala-2.12/
-          ls -R ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
           cd $GITHUB_WORKSPACE/
           export SPARK_SCALA_VERSION=2.12
           yum install -y java-17-openjdk-devel

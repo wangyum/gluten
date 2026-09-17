@@ -400,20 +400,6 @@
           <type>test-jar</type>
           <scope>test</scope>
           <exclusions>
-            <!--
-              iceberg-arrow pulls in arrow-memory-netty from a foreign Arrow
-              version. Its legacy org.apache.arrow.memory.DefaultAllocationManagerFactory
-              resource fools Arrow's CheckAllocator into selecting the netty
-              factory class, which only exists in the matching Arrow version,
-              crashing RootAllocator class-init with ClassNotFoundException.
-              Keep the classpath on a single Arrow: the one gluten bundles
-              (Spark 3.x) or the one Spark ships (Spark 4.x, where this
-              exclusion is a no-op).
-            -->
-            <exclusion>
-              <groupId>${spark.arrow.exclusion.groupId}</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
             <exclusion>
               <groupId>org.apache.parquet</groupId>
               <artifactId>parquet-avro</artifactId>
