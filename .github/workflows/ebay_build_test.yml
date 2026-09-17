@@ -235,6 +235,9 @@ jobs:
           path: /root/.m2/repository
       - name: Setup tzdata
         run: |
+          ls -lR ${TEST_SPARK_HOME}assembly/target/scala-2.12/jars/*
+          echo "scala-2.13"
+          ls -lR ${TEST_SPARK213_HOME}/assembly/target/scala-2.13/jars/
           sed -i 's|http://archive|http://eu.archive|g' /etc/apt/sources.list
           if [ "${{ matrix.os }}" = "ubuntu:22.04" ]; then
             apt-get update
