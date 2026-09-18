@@ -886,12 +886,6 @@ class VeloxTestSettings extends BackendTestSettings {
   enableSuite[GlutenMiscFunctionsSuite]
   enableSuite[GlutenNestedDataSourceV1Suite]
   enableSuite[GlutenNestedDataSourceV2Suite]
-    // Overridden.
-    .exclude("NOT NULL checks for nullable map with required values (byName)")
-    // Overridden.
-    .exclude("NOT NULL checks for nullable map with required values (byPosition)")
-    // Overridden.
-    .exclude("NOT NULL checks for fields inside nullable maps (byPosition)")
   enableSuite[GlutenProcessingTimeSuite]
   enableSuite[GlutenProductAggSuite]
   enableSuite[GlutenReplaceNullWithFalseInPredicateEndToEndSuite]
@@ -1006,6 +1000,12 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("NOT NULL checks for nested structs, arrays, maps (byPosition)")
     .exclude("NOT NULL checks for nullable array with required element (byPosition)")
     .exclude("not null checks for fields inside nullable array (byPosition)")
+    // Overridden.
+    .exclude("NOT NULL checks for nullable map with required values (byName)")
+    // Overridden.
+    .exclude("NOT NULL checks for nullable map with required values (byPosition)")
+    // Overridden.
+    .exclude("NOT NULL checks for fields inside nullable maps (byPosition)")
   enableSuite[GlutenTableOptionsConstantFoldingSuite]
   enableSuite[GlutenDeltaBasedMergeIntoTableSuite]
   enableSuite[GlutenDeltaBasedMergeIntoTableUpdateAsDeleteAndInsertSuite]
