@@ -298,39 +298,47 @@ abstract class DeleteSuiteBase
     checkDelete(Some("value <=> null"), Row("c", "v") :: Row("d", "vv") :: Nil)
   }
 
-  test("do not support subquery test") {
+  test("Subquery support in DELETE - supported cases") {
     append(Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("key", "value"))
     Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("c", "d").createOrReplaceTempView("source")
 
-    // basic subquery
-    val e0 = intercept[AnalysisException] {
-      executeDelete(target = s"delta.`$tempPath`", "key < (SELECT max(c) FROM source)")
-    }.getMessage
-    assert(e0.contains("Subqueries are not supported"))
+    // Non-correlated scalar subquery in WHERE is supported
+    executeDelete(target = s"delta.`$tempPath`", "key < (SELECT max(c) FROM source)")
+    checkAnswer(
+      readDeltaTable(tempPath).select("key", "value"),
+      Row(2, 2) :: Nil)
 
-    // subquery with EXISTS
+    // Re-populate for next check
+    append(Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("key", "value"))
+
+    // Non-correlated IN subquery in WHERE is supported
+    executeDelete(target = s"delta.`$tempPath`", "key IN (SELECT max(c) FROM source)")
+    checkAnswer(
+      readDeltaTable(tempPath).select("key", "value"),
+      Row(1, 4) :: Row(1, 1) :: Row(0, 3) :: Nil)
+  }
+
+  test("Subquery support in DELETE - unsupported cases") {
+    append(Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("key", "value"))
+    Seq((2, 2), (1, 4), (1, 1), (0, 3)).toDF("c", "d").createOrReplaceTempView("source")
+
+    // Non-correlated EXISTS is not supported
     val e1 = intercept[AnalysisException] {
       executeDelete(target = s"delta.`$tempPath`", "EXISTS (SELECT max(c) FROM source)")
     }.getMessage
-    assert(e1.contains("Subqueries are not supported"))
+    assert(e1.contains("In or uncorrelated subquery is supported only"))
 
-    // subquery with NOT EXISTS
+    // Non-correlated NOT EXISTS is not supported
     val e2 = intercept[AnalysisException] {
       executeDelete(target = s"delta.`$tempPath`", "NOT EXISTS (SELECT max(c) FROM source)")
     }.getMessage
-    assert(e2.contains("Subqueries are not supported"))
+    assert(e2.contains("In or uncorrelated subquery is supported only"))
 
-    // subquery with IN
-    val e3 = intercept[AnalysisException] {
-      executeDelete(target = s"delta.`$tempPath`", "key IN (SELECT max(c) FROM source)")
-    }.getMessage
-    assert(e3.contains("Subqueries are not supported"))
-
-    // subquery with NOT IN
+    // NOT IN without IS NOT NULL in the subquery is not supported
     val e4 = intercept[AnalysisException] {
       executeDelete(target = s"delta.`$tempPath`", "key NOT IN (SELECT max(c) FROM source)")
     }.getMessage
-    assert(e4.contains("Subqueries are not supported"))
+    assert(e4.contains("NOT IN subquery without IS NOT NULL is not supported"))
   }
 
   test("schema pruning on data condition") {
@@ -395,11 +403,11 @@ abstract class DeleteSuiteBase
 
         val expectedErrorRegex = "(?s).*(?i)unsupported.*(?i).*Invalid expressions.*"
 
-        var catchException = true
+        var catchException = if (functionType.equals("Generate")) {
+          expectException
+        } else true
 
-        var errorRegex = if (functionType.equals("Generate")) {
-          ".*Subqueries are not supported in the DELETE.*"
-        } else customErrorRegex.getOrElse(expectedErrorRegex)
+        var errorRegex = customErrorRegex.getOrElse(expectedErrorRegex)
 
         if (catchException) {
           val dataBeforeException = spark.read.format("delta").table("deltaTable").collect()
